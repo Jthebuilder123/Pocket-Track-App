@@ -4,6 +4,7 @@
 SubTracker is a modern web application for tracking and managing recurring subscriptions. It helps users monitor their subscription spending, visualize costs by category, and stay on top of upcoming renewals.
 
 ## Features
+- **Passwordless Authentication**: Secure magic-link login via email with JWT tokens
 - **Dashboard**: Overview of all subscriptions with monthly/annual totals
 - **Subscription Management**: Add, edit, and delete subscriptions
 - **Visual Analytics**: Charts showing spending by category and billing frequency
@@ -31,6 +32,18 @@ SubTracker is a modern web application for tracking and managing recurring subsc
 - **Form Handling**: React Hook Form with Zod validation
 
 ### Data Model
+**User Entity**:
+- `id`: Auto-incrementing identifier
+- `email`: User email address (unique)
+- `createdAt`: Account creation timestamp
+
+**Email Signup Entity**:
+- `id`: Auto-incrementing identifier
+- `email`: Email address
+- `token`: JWT magic link token
+- `tag`: Purpose tag ("app_login" or "waitlist")
+- `createdAt`: Request timestamp
+
 **Subscription Entity**:
 - `id`: Unique identifier (UUID)
 - `name`: Subscription service name
@@ -73,6 +86,7 @@ client/
 │   │   ├── bank-connect.tsx          # Plaid bank connection UI
 │   │   └── detected-subscriptions.tsx # Auto-detected subscriptions review
 │   ├── pages/
+│   │   ├── login.tsx                 # Passwordless login page
 │   │   └── not-found.tsx             # 404 page
 │   ├── lib/
 │   │   └── queryClient.ts            # React Query setup
@@ -82,14 +96,24 @@ client/
 shared/
 └── schema.ts                         # Shared types, Zod schemas, Drizzle tables
 server/
-├── routes.ts                         # API routes (subscriptions + Plaid)
+├── routes.ts                         # API routes (subscriptions + Plaid + auth)
 ├── storage.ts                        # Storage interface and database operations
+├── auth.ts                           # JWT token generation, magic link emails
+├── authMiddleware.ts                 # Auth middleware (requireAuth, optionalAuth)
+├── logger.ts                         # Winston logger configuration
 ├── plaid.ts                          # Plaid API client configuration
 └── db.ts                             # Database connection
 ```
 
 ### API Endpoints
 All endpoints prefixed with `/api`:
+
+**Authentication Endpoints**:
+- `POST /api/auth/login` - Request magic link (expects: email, next?)
+- `GET /api/auth/magic` - Verify magic link and create session (query: token, next?)
+- `POST /api/auth/logout` - Clear session cookie
+- `GET /api/auth/me` - Get current authenticated user
+- `POST /api/signup` - Waitlist signup (expects: email)
 
 **Subscription Endpoints**:
 - `GET /api/subscriptions` - Get all subscriptions
@@ -161,6 +185,16 @@ All endpoints prefixed with `/api`:
     - Global error handling middleware with proper 400-500 status codes
     - Production-safe error responses (no stack traces exposed)
     - Dependency optimization (removed 22 unused packages)
+  - **Passwordless Authentication**: Implemented secure magic-link email authentication
+    - Extended database schema with users and email_signups tables using Drizzle ORM
+    - Created auth service with JWT token generation/validation (15-minute expiration)
+    - Integrated SendGrid for email delivery (with console fallback for development)
+    - Built React login page with email input form and success states
+    - Added rate limiting (10 requests/minute on auth endpoints)
+    - Created auth middleware (requireAuth, optionalAuth) for protected routes
+    - Implemented session management with secure httpOnly cookies (14-day expiration)
+    - Fixed critical open-redirect vulnerability in magic link handler by validating redirect parameters to only allow same-origin relative paths
+    - Complete end-to-end testing verified: login flow, magic link validation, session management, rate limiting, and open redirect protection
 
 ## Production Features
 - **Health Monitoring**: `/healthz` for basic health checks, `/diagnostics` for detailed system status
