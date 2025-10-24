@@ -10,6 +10,10 @@ SubTracker is a modern web application for tracking and managing recurring subsc
 - **Upcoming Renewals**: Timeline view of subscriptions due for renewal
 - **Filtering & Sorting**: Search and filter subscriptions by category, billing cycle, or renewal date
 - **Responsive Design**: Beautiful UI that works on desktop, tablet, and mobile
+- **Database Persistence**: PostgreSQL storage for data persistence across sessions
+- **History Tracking**: Complete audit trail of subscription changes
+- **Cancellation**: Cancel subscriptions with optional reasons
+- **Data Export**: Export subscriptions to CSV or JSON formats
 
 ## Project Architecture
 
@@ -77,8 +81,11 @@ All endpoints prefixed with `/api`:
 1. **Add Subscription**: Click "Add Subscription" → Fill form → Save
 2. **Edit Subscription**: Click "Edit" on card → Modify → Update
 3. **Delete Subscription**: Click "Delete" → Confirm → Remove
-4. **Filter Subscriptions**: Use search bar or category/billing filters
-5. **View Analytics**: Dashboard shows charts and upcoming renewals automatically
+4. **Cancel Subscription**: Click "Cancel" → Add reason (optional) → Confirm
+5. **View History**: Click "History" → See complete audit trail of changes
+6. **Export Data**: Click "Export" → Choose CSV or JSON → Download file
+7. **Filter Subscriptions**: Use search bar or category/billing filters
+8. **View Analytics**: Dashboard shows charts and upcoming renewals automatically
 
 ## Recent Changes
 - **2025-10-24**: Complete implementation of subscription management tracker
@@ -97,8 +104,9 @@ All endpoints prefixed with `/api`:
 
 ## Development
 - **Start**: Run `npm run dev` (automatically configured)
-- **Storage**: Uses in-memory storage for fast prototyping
+- **Storage**: PostgreSQL database via Drizzle ORM
 - **Styling**: Tailwind CSS with design tokens in index.css
+- **Database**: `npm run db:push` to sync schema changes
 
 ## User Preferences
 - Clean, modern SaaS dashboard aesthetic
