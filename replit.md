@@ -101,14 +101,13 @@ All endpoints prefixed with `/api`:
 
 **Plaid Integration Endpoints**:
 - `POST /api/plaid/create-link-token` - Generate Plaid Link token for bank connection
-- `POST /api/plaid/exchange-token` - Exchange public token for access token
-- `GET /api/plaid/connections` - Get all connected bank accounts
-- `POST /api/plaid/sync-transactions/:id` - Sync and analyze transactions from bank
-- `DELETE /api/plaid/disconnect/:id` - Disconnect bank account
-- `GET /api/plaid/detected-subscriptions` - Get pending detected subscriptions
-- `GET /api/plaid/detected-subscriptions/:id` - Get single detected subscription
-- `POST /api/plaid/detected-subscriptions/:id/confirm` - Confirm and convert to subscription
-- `DELETE /api/plaid/detected-subscriptions/:id` - Dismiss detected subscription
+- `POST /api/plaid/exchange-token` - Exchange public token for access token (expects: public_token, institution_id, institution_name, accounts)
+- `GET /api/bank-connections` - Get all connected bank accounts
+- `POST /api/bank-connections/:id/sync` - Sync and analyze transactions from bank
+- `DELETE /api/bank-connections/:id` - Disconnect bank account
+- `GET /api/detected-subscriptions` - Get pending detected subscriptions
+- `POST /api/detected-subscriptions/:id/confirm` - Confirm and convert to subscription
+- `DELETE /api/detected-subscriptions/:id` - Dismiss detected subscription
 
 ### Design System
 - **Primary Color**: Blue (hsl(220, 90%, 56%))
@@ -132,7 +131,7 @@ All endpoints prefixed with `/api`:
 12. **Confirm Detection**: Click "Confirm & Add" to add detected subscription, or "Edit Before Adding" to modify details first
 
 ## Recent Changes
-- **2025-10-24**: Complete implementation of subscription management tracker
+- **2025-10-24**: Complete implementation of subscription management tracker with Plaid bank integration
   - Created data models for subscriptions with Zod validation
   - Built all React components with Shadcn UI following design guidelines
   - Implemented responsive dashboard layout with stats cards
@@ -145,7 +144,7 @@ All endpoints prefixed with `/api`:
   - All TypeScript errors resolved
   - **Database Persistence**: Migrated from in-memory to PostgreSQL storage
   - **Subscription History & Cancellation**: Added status tracking, cancellation workflow with reasons, and complete audit history for all subscription changes
-  - **Plaid Bank Integration**: Integrated Plaid API for secure bank account connectivity
+  - **Plaid Bank Integration**: Fully integrated Plaid API for secure bank account connectivity
     - Extended database schema with bank_connections and detected_subscriptions tables
     - Built backend Plaid integration (link token, token exchange, transaction sync)
     - Implemented subscription detection algorithm analyzing recurring charges
@@ -153,6 +152,8 @@ All endpoints prefixed with `/api`:
     - Created DetectedSubscriptions component for reviewing auto-detected subscriptions
     - Added tabbed interface to dashboard: "My Subscriptions", "Detected", "Bank Connections"
     - Detection features: confidence scoring, merchant categorization, billing cycle identification
+    - Fixed API contract alignment between frontend and backend (snake_case for Plaid fields)
+    - Complete end-to-end testing verified: bank connection, transaction sync, subscription detection, confirmation flow
 
 ## Development
 - **Start**: Run `npm run dev` (automatically configured)
