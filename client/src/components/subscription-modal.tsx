@@ -254,6 +254,7 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
                       className="resize-none"
                       rows={3}
                       {...field}
+                      value={field.value || ""}
                       data-testid="input-notes"
                     />
                   </FormControl>

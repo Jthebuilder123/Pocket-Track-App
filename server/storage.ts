@@ -34,6 +34,7 @@ export class MemStorage implements IStorage {
       nextRenewalDate: insertSubscription.nextRenewalDate instanceof Date 
         ? insertSubscription.nextRenewalDate 
         : new Date(insertSubscription.nextRenewalDate),
+      notes: insertSubscription.notes || null,
     };
     this.subscriptions.set(id, subscription);
     return subscription;
@@ -52,6 +53,7 @@ export class MemStorage implements IStorage {
       nextRenewalDate: insertSubscription.nextRenewalDate instanceof Date 
         ? insertSubscription.nextRenewalDate 
         : new Date(insertSubscription.nextRenewalDate),
+      notes: insertSubscription.notes || null,
     };
     this.subscriptions.set(id, updated);
     return updated;
