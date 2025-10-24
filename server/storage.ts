@@ -1,5 +1,6 @@
-import { type Subscription, type InsertSubscription } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { type Subscription, type InsertSubscription, subscriptions } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // Subscription operations
@@ -10,58 +11,51 @@ export interface IStorage {
   deleteSubscription(id: string): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private subscriptions: Map<string, Subscription>;
-
-  constructor() {
-    this.subscriptions = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getAllSubscriptions(): Promise<Subscription[]> {
-    return Array.from(this.subscriptions.values());
+    return await db.select().from(subscriptions);
   }
 
   async getSubscription(id: string): Promise<Subscription | undefined> {
-    return this.subscriptions.get(id);
+    const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.id, id));
+    return subscription || undefined;
   }
 
   async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
-    const id = randomUUID();
-    const subscription: Subscription = {
-      ...insertSubscription,
-      id,
-      cost: insertSubscription.cost.toString(),
-      nextRenewalDate: insertSubscription.nextRenewalDate instanceof Date 
-        ? insertSubscription.nextRenewalDate 
-        : new Date(insertSubscription.nextRenewalDate),
-      notes: insertSubscription.notes || null,
-    };
-    this.subscriptions.set(id, subscription);
+    const [subscription] = await db
+      .insert(subscriptions)
+      .values({
+        ...insertSubscription,
+        cost: insertSubscription.cost.toString(),
+        nextRenewalDate: insertSubscription.nextRenewalDate instanceof Date 
+          ? insertSubscription.nextRenewalDate 
+          : new Date(insertSubscription.nextRenewalDate),
+        notes: insertSubscription.notes || null,
+      })
+      .returning();
     return subscription;
   }
 
   async updateSubscription(id: string, insertSubscription: InsertSubscription): Promise<Subscription | undefined> {
-    const existing = this.subscriptions.get(id);
-    if (!existing) {
-      return undefined;
-    }
-
-    const updated: Subscription = {
-      ...insertSubscription,
-      id,
-      cost: insertSubscription.cost.toString(),
-      nextRenewalDate: insertSubscription.nextRenewalDate instanceof Date 
-        ? insertSubscription.nextRenewalDate 
-        : new Date(insertSubscription.nextRenewalDate),
-      notes: insertSubscription.notes || null,
-    };
-    this.subscriptions.set(id, updated);
-    return updated;
+    const [subscription] = await db
+      .update(subscriptions)
+      .set({
+        ...insertSubscription,
+        cost: insertSubscription.cost.toString(),
+        nextRenewalDate: insertSubscription.nextRenewalDate instanceof Date 
+          ? insertSubscription.nextRenewalDate 
+          : new Date(insertSubscription.nextRenewalDate),
+        notes: insertSubscription.notes || null,
+      })
+      .where(eq(subscriptions.id, id))
+      .returning();
+    return subscription || undefined;
   }
 
   async deleteSubscription(id: string): Promise<boolean> {
-    return this.subscriptions.delete(id);
+    const result = await db.delete(subscriptions).where(eq(subscriptions.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
