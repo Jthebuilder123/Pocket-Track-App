@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText, LogOut, LogIn, User } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +26,41 @@ export function DashboardPage() {
   const [billingFilter, setBillingFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("name");
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data: subscriptions = [], isLoading } = useQuery<Subscription[]>({
     queryKey: ["/api/subscriptions"],
+  });
+
+  // Check authentication status
+  const { data: user } = useQuery<{ email: string } | null>({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+  });
+
+  // Logout mutation
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Logout failed");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out",
+      });
+      setLocation("/login");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to logout",
+        variant: "destructive",
+      });
+    },
   });
 
   // Calculate statistics (only for active subscriptions)
@@ -179,6 +212,14 @@ export function DashboardPage() {
             <h1 className="text-xl font-semibold">SubTracker</h1>
           </div>
           <div className="flex items-center gap-2">
+            {user && (
+              <div className="flex items-center gap-2 mr-2">
+                <User className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground" data-testid="text-user-email">
+                  {user.email}
+                </span>
+              </div>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="default" data-testid="button-export">
@@ -201,6 +242,26 @@ export function DashboardPage() {
               <Plus className="w-4 h-4 mr-2" />
               Add Subscription
             </Button>
+            {user ? (
+              <Button
+                variant="outline"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+                data-testid="button-logout"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                onClick={() => setLocation("/login")}
+                data-testid="button-login"
+              >
+                <LogIn className="w-4 h-4 mr-2" />
+                Login
+              </Button>
+            )}
           </div>
         </div>
       </header>

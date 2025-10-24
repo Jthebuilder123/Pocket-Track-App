@@ -141,18 +141,20 @@ All endpoints prefixed with `/api`:
 - **Interactions**: Hover elevations, smooth transitions
 
 ### Key User Flows
-1. **Add Subscription Manually**: Click "Add Subscription" → Fill form → Save
-2. **Edit Subscription**: Click "Edit" on card → Modify → Update
-3. **Delete Subscription**: Click "Delete" → Confirm → Remove
-4. **Cancel Subscription**: Click "Cancel" → Add reason (optional) → Confirm
-5. **View History**: Click "History" → See complete audit trail of changes
-6. **Export Data**: Click "Export" → Choose CSV or JSON → Download file
-7. **Filter Subscriptions**: Use search bar or category/billing filters
-8. **View Analytics**: Dashboard shows charts and upcoming renewals automatically
-9. **Connect Bank**: Navigate to "Bank Connections" tab → Click "Connect Bank" → Select institution via Plaid Link
-10. **Sync Transactions**: Click "Sync Transactions" on connected bank → System analyzes last 90 days
-11. **Review Detected**: Navigate to "Detected" tab → Review auto-detected subscriptions with confidence scores
-12. **Confirm Detection**: Click "Confirm & Add" to add detected subscription, or "Edit Before Adding" to modify details first
+1. **Login**: Navigate to homepage → Click "Login" button → Enter email → Click magic link in email
+2. **Logout**: Click "Logout" button in header → Redirected to login page
+3. **Add Subscription Manually**: Click "Add Subscription" → Fill form → Save
+4. **Edit Subscription**: Click "Edit" on card → Modify → Update
+5. **Delete Subscription**: Click "Delete" → Confirm → Remove
+6. **Cancel Subscription**: Click "Cancel" → Add reason (optional) → Confirm
+7. **View History**: Click "History" → See complete audit trail of changes
+8. **Export Data**: Click "Export" → Choose CSV or JSON → Download file
+9. **Filter Subscriptions**: Use search bar or category/billing filters
+10. **View Analytics**: Dashboard shows charts and upcoming renewals automatically
+11. **Connect Bank**: Navigate to "Bank Connections" tab → Click "Connect Bank" → Select institution via Plaid Link
+12. **Sync Transactions**: Click "Sync Transactions" on connected bank → System analyzes last 90 days
+13. **Review Detected**: Navigate to "Detected" tab → Review auto-detected subscriptions with confidence scores
+14. **Confirm Detection**: Click "Confirm & Add" to add detected subscription, or "Edit Before Adding" to modify details first
 
 ## Recent Changes
 - **2025-10-24**: Complete implementation of subscription management tracker with Plaid bank integration
