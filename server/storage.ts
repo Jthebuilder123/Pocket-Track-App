@@ -1,6 +1,7 @@
-import { type Subscription, type InsertSubscription, type InsertHistory, type SubscriptionHistory, subscriptions, subscriptionHistory } from "@shared/schema";
+import { type Subscription, type InsertSubscription, type InsertHistory, type SubscriptionHistory, type BankConnection, type DetectedSubscription, type InsertDetectedSubscription, subscriptions, subscriptionHistory, bankConnections, detectedSubscriptions } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
+import type { Transaction } from "plaid";
 
 export interface IStorage {
   // Subscription operations
@@ -14,6 +15,20 @@ export interface IStorage {
   // History operations
   getSubscriptionHistory(subscriptionId: string): Promise<SubscriptionHistory[]>;
   addHistoryEntry(entry: InsertHistory): Promise<SubscriptionHistory>;
+  
+  // Bank connection operations
+  getAllBankConnections(): Promise<BankConnection[]>;
+  getBankConnection(id: string): Promise<BankConnection | undefined>;
+  createBankConnection(connection: Omit<BankConnection, "id" | "createdAt">): Promise<BankConnection>;
+  deleteBankConnection(id: string): Promise<boolean>;
+  updateBankConnectionSyncTime(id: string): Promise<void>;
+  
+  // Detected subscriptions operations
+  getDetectedSubscriptions(): Promise<DetectedSubscription[]>;
+  getDetectedSubscription(id: string): Promise<DetectedSubscription | undefined>;
+  detectSubscriptionsFromTransactions(transactions: Transaction[]): Promise<DetectedSubscription[]>;
+  markDetectedSubscriptionAsConfirmed(id: string): Promise<void>;
+  deleteDetectedSubscription(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -153,6 +168,151 @@ export class DatabaseStorage implements IStorage {
       .values(entry)
       .returning();
     return historyEntry;
+  }
+
+  // Bank connection methods
+  async getAllBankConnections(): Promise<BankConnection[]> {
+    return await db.select().from(bankConnections);
+  }
+
+  async getBankConnection(id: string): Promise<BankConnection | undefined> {
+    const [connection] = await db.select().from(bankConnections).where(eq(bankConnections.id, id));
+    return connection || undefined;
+  }
+
+  async createBankConnection(connection: Omit<BankConnection, "id" | "createdAt">): Promise<BankConnection> {
+    const [newConnection] = await db
+      .insert(bankConnections)
+      .values(connection)
+      .returning();
+    return newConnection;
+  }
+
+  async deleteBankConnection(id: string): Promise<boolean> {
+    const result = await db.delete(bankConnections).where(eq(bankConnections.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async updateBankConnectionSyncTime(id: string): Promise<void> {
+    await db
+      .update(bankConnections)
+      .set({ lastSyncedAt: new Date() })
+      .where(eq(bankConnections.id, id));
+  }
+
+  // Detected subscriptions methods
+  async getDetectedSubscriptions(): Promise<DetectedSubscription[]> {
+    return await db.select().from(detectedSubscriptions).where(eq(detectedSubscriptions.status, "pending"));
+  }
+
+  async getDetectedSubscription(id: string): Promise<DetectedSubscription | undefined> {
+    const [detected] = await db.select().from(detectedSubscriptions).where(eq(detectedSubscriptions.id, id));
+    return detected || undefined;
+  }
+
+  async detectSubscriptionsFromTransactions(transactions: Transaction[]): Promise<DetectedSubscription[]> {
+    const merchantGroups = new Map<string, Transaction[]>();
+    
+    for (const txn of transactions) {
+      if (txn.amount <= 0) continue;
+      
+      const merchantName = txn.merchant_name || txn.name || "Unknown";
+      if (!merchantGroups.has(merchantName)) {
+        merchantGroups.set(merchantName, []);
+      }
+      merchantGroups.get(merchantName)!.push(txn);
+    }
+
+    const detected: DetectedSubscription[] = [];
+
+    for (const [merchantName, txns] of Array.from(merchantGroups.entries())) {
+      if (txns.length < 2) continue;
+
+      txns.sort((a: Transaction, b: Transaction) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      const intervals: number[] = [];
+      for (let i = 1; i < txns.length; i++) {
+        const daysBetween = Math.round(
+          (new Date(txns[i].date).getTime() - new Date(txns[i - 1].date).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        intervals.push(daysBetween);
+      }
+
+      const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+      const variance = intervals.reduce((sum, interval) => sum + Math.pow(interval - avgInterval, 2), 0) / intervals.length;
+      const stdDev = Math.sqrt(variance);
+
+      if (stdDev / avgInterval > 0.3) continue;
+
+      let billingCycle: "Monthly" | "Quarterly" | "Yearly" = "Monthly";
+      if (avgInterval >= 80 && avgInterval <= 100) {
+        billingCycle = "Quarterly";
+      } else if (avgInterval >= 350 && avgInterval <= 380) {
+        billingCycle = "Yearly";
+      }
+
+      const avgCost = txns.reduce((sum: number, t: Transaction) => sum + t.amount, 0) / txns.length;
+      const costVariance = txns.reduce((sum: number, t: Transaction) => sum + Math.pow(t.amount - avgCost, 2), 0) / txns.length;
+      const costStdDev = Math.sqrt(costVariance);
+
+      const confidence = Math.max(50, Math.min(99, 100 - (stdDev / avgInterval * 100) - (costStdDev / avgCost * 50)));
+
+      const category = this.categorizeTransaction(merchantName);
+
+      const [detectedSub] = await db
+        .insert(detectedSubscriptions)
+        .values({
+          merchantName,
+          estimatedCost: avgCost.toFixed(2),
+          detectedBillingCycle: billingCycle,
+          category,
+          transactionIds: txns.map((t: Transaction) => t.transaction_id),
+          confidence: confidence.toFixed(0),
+          status: "pending",
+        })
+        .returning();
+
+      detected.push(detectedSub);
+    }
+
+    return detected;
+  }
+
+  private categorizeTransaction(merchantName: string): string {
+    const name = merchantName.toLowerCase();
+    
+    if (name.includes("netflix") || name.includes("hulu") || name.includes("disney") || name.includes("hbo") || name.includes("prime video") || name.includes("youtube")) {
+      return "Streaming";
+    }
+    if (name.includes("spotify") || name.includes("apple music") || name.includes("pandora")) {
+      return "Music";
+    }
+    if (name.includes("github") || name.includes("adobe") || name.includes("microsoft") || name.includes("google workspace")) {
+      return "Software";
+    }
+    if (name.includes("dropbox") || name.includes("icloud") || name.includes("google one")) {
+      return "Cloud Storage";
+    }
+    if (name.includes("gym") || name.includes("fitness") || name.includes("peloton")) {
+      return "Fitness";
+    }
+    if (name.includes("news") || name.includes("times") || name.includes("post")) {
+      return "News & Media";
+    }
+    
+    return "Other";
+  }
+
+  async markDetectedSubscriptionAsConfirmed(id: string): Promise<void> {
+    await db
+      .update(detectedSubscriptions)
+      .set({ status: "confirmed" })
+      .where(eq(detectedSubscriptions.id, id));
+  }
+
+  async deleteDetectedSubscription(id: string): Promise<boolean> {
+    const result = await db.delete(detectedSubscriptions).where(eq(detectedSubscriptions.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 }
 

@@ -83,3 +83,38 @@ export type SubscriptionHistory = typeof subscriptionHistory.$inferSelect;
 export const cancelSubscriptionSchema = z.object({
   reason: z.string().optional(),
 });
+
+// Bank connections table
+export const bankConnections = pgTable("bank_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  institutionId: text("institution_id").notNull(),
+  institutionName: text("institution_name").notNull(),
+  accessToken: text("access_token").notNull(),
+  itemId: text("item_id").notNull(),
+  accountIds: text("account_ids").array().notNull(),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export type BankConnection = typeof bankConnections.$inferSelect;
+
+// Detected subscriptions (pending user confirmation)
+export const detectedSubscriptions = pgTable("detected_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  merchantName: text("merchant_name").notNull(),
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }).notNull(),
+  detectedBillingCycle: text("detected_billing_cycle").notNull(),
+  category: text("category"),
+  transactionIds: text("transaction_ids").array().notNull(),
+  confidence: decimal("confidence", { precision: 5, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertDetectedSubscriptionSchema = createInsertSchema(detectedSubscriptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type DetectedSubscription = typeof detectedSubscriptions.$inferSelect;
+export type InsertDetectedSubscription = z.infer<typeof insertDetectedSubscriptionSchema>;
