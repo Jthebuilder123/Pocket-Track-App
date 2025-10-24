@@ -118,3 +118,32 @@ export const insertDetectedSubscriptionSchema = createInsertSchema(detectedSubsc
 
 export type DetectedSubscription = typeof detectedSubscriptions.$inferSelect;
 export type InsertDetectedSubscription = z.infer<typeof insertDetectedSubscriptionSchema>;
+
+// User table for authentication
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  plan: text("plan").notNull().default("free"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+
+// Email signup table for waitlist and login tracking
+export const emailSignups = pgTable("email_signups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  tag: text("tag").notNull().default("waitlist"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertEmailSignupSchema = createInsertSchema(emailSignups).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type EmailSignup = typeof emailSignups.$inferSelect;
+export type InsertEmailSignup = z.infer<typeof insertEmailSignupSchema>;

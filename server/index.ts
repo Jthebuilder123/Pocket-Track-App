@@ -1,8 +1,26 @@
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
+import cors from "cors";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+}));
+
+// CORS configuration
+const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:5000";
+app.use(cors({
+  origin: APP_BASE_URL,
+  credentials: true,
+}));
+
+// Cookie parser
+app.use(cookieParser());
 
 declare module 'http' {
   interface IncomingMessage {

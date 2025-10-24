@@ -1,11 +1,23 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { insertSubscriptionSchema, cancelSubscriptionSchema } from "@shared/schema";
+import { insertSubscriptionSchema, cancelSubscriptionSchema, insertEmailSignupSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getInstitution } from "./plaid";
 import { z } from "zod";
 import logger from "./logger";
+import { generateMagicToken, generateSessionToken, verifyMagicToken, sendMagicLink } from "./auth";
+import { requireAuth, optionalAuth, type AuthRequest } from "./authMiddleware";
+
+// Rate limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 requests per minute
+  message: { error: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint
@@ -24,11 +36,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subscriptions = await storage.getAllSubscriptions();
       const dbStatus = "connected";
       
+      // Check environment variables
+      const envOk = Boolean(process.env.JWT_SECRET && process.env.DATABASE_URL);
+      
       res.status(200).json({
         status: "ok",
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         environment: process.env.NODE_ENV || "development",
+        env_ok: envOk,
+        db_ok: true,
         database: {
           status: dbStatus,
           subscriptionCount: subscriptions.length
@@ -44,8 +61,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(503).json({
         status: "degraded",
         timestamp: new Date().toISOString(),
-        error: "Database connection failed"
+        error: "Database connection failed",
+        env_ok: Boolean(process.env.JWT_SECRET && process.env.DATABASE_URL),
+        db_ok: false,
       });
+    }
+  });
+
+  // ===== Authentication Routes =====
+
+  // POST /api/auth/login - Request magic link
+  app.post("/api/auth/login", authLimiter, async (req, res) => {
+    try {
+      const schema = z.object({
+        email: z.string().email(),
+        next: z.string().optional(),
+      });
+
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromZodError(result.error).toString() });
+      }
+
+      const { email, next } = result.data;
+      const normalizedEmail = email.toLowerCase();
+
+      // Store email in EmailSignup table
+      await storage.createEmailSignup({
+        email: normalizedEmail,
+        tag: "app_login",
+      });
+
+      // Generate magic link token
+      const token = generateMagicToken(normalizedEmail);
+
+      // Send magic link
+      await sendMagicLink(normalizedEmail, token, next);
+
+      res.json({ ok: true, message: "Magic link sent to your email" });
+    } catch (error) {
+      logger.error("Error sending magic link", { error });
+      res.status(500).json({ error: "Failed to send magic link" });
+    }
+  });
+
+  // GET /api/auth/magic - Verify magic link and log in
+  app.get("/api/auth/magic", authLimiter, async (req, res) => {
+    try {
+      const token = req.query.token as string;
+      let next = (req.query.next as string) || "/";
+
+      if (!token) {
+        return res.redirect(`/login?error=${encodeURIComponent("Missing token")}`);
+      }
+
+      // Validate next parameter to prevent open redirects
+      // Only allow same-origin relative paths
+      if (next && (!next.startsWith("/") || next.startsWith("//"))) {
+        logger.warn("Invalid redirect attempt blocked", { next });
+        next = "/";
+      }
+
+      const payload = verifyMagicToken(token);
+      
+      if (!payload) {
+        return res.redirect(`/login?error=${encodeURIComponent("Invalid or expired link")}`);
+      }
+
+      // Upsert user
+      await storage.upsertUser(payload.email);
+
+      // Generate session token
+      const sessionToken = generateSessionToken(payload.email);
+
+      // Set httpOnly cookie
+      res.cookie("session", sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
+      });
+
+      logger.info("User logged in", { email: payload.email });
+      res.redirect(next);
+    } catch (error) {
+      logger.error("Error verifying magic link", { error });
+      res.redirect(`/login?error=${encodeURIComponent("Authentication failed")}`);
+    }
+  });
+
+  // POST /api/auth/logout - Clear session
+  app.post("/api/auth/logout", (req, res) => {
+    res.clearCookie("session");
+    res.json({ ok: true });
+  });
+
+  // GET /api/auth/me - Get current user
+  app.get("/api/auth/me", optionalAuth, async (req: AuthRequest, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUserByEmail(req.user.email);
+      if (!user) {
+        res.clearCookie("session");
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      res.json({
+        email: user.email,
+        plan: user.plan,
+        name: user.name,
+      });
+    } catch (error) {
+      logger.error("Error fetching user", { error });
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // POST /api/signup - Collect email for waitlist
+  app.post("/api/signup", authLimiter, async (req, res) => {
+    try {
+      const result = insertEmailSignupSchema.safeParse({
+        email: req.body.email?.toLowerCase(),
+        tag: "waitlist",
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ error: fromZodError(result.error).toString() });
+      }
+
+      await storage.createEmailSignup(result.data);
+      res.json({ ok: true, message: "Thank you for signing up!" });
+    } catch (error) {
+      logger.error("Error creating email signup", { error });
+      res.status(500).json({ error: "Failed to save email" });
     }
   });
 

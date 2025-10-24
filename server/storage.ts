@@ -1,6 +1,6 @@
-import { type Subscription, type InsertSubscription, type InsertHistory, type SubscriptionHistory, type BankConnection, type DetectedSubscription, type InsertDetectedSubscription, subscriptions, subscriptionHistory, bankConnections, detectedSubscriptions } from "@shared/schema";
+import { type Subscription, type InsertSubscription, type InsertHistory, type SubscriptionHistory, type BankConnection, type DetectedSubscription, type InsertDetectedSubscription, type User, type EmailSignup, type InsertEmailSignup, subscriptions, subscriptionHistory, bankConnections, detectedSubscriptions, users, emailSignups } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql as drizzleSql } from "drizzle-orm";
 import type { Transaction } from "plaid";
 
 export interface IStorage {
@@ -29,6 +29,14 @@ export interface IStorage {
   detectSubscriptionsFromTransactions(transactions: Transaction[]): Promise<DetectedSubscription[]>;
   markDetectedSubscriptionAsConfirmed(id: string): Promise<void>;
   deleteDetectedSubscription(id: string): Promise<boolean>;
+  
+  // User operations
+  getUserByEmail(email: string): Promise<User | undefined>;
+  upsertUser(email: string, name?: string): Promise<User>;
+  
+  // Email signup operations
+  createEmailSignup(signup: InsertEmailSignup): Promise<EmailSignup>;
+  getEmailSignups(): Promise<EmailSignup[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -313,6 +321,50 @@ export class DatabaseStorage implements IStorage {
   async deleteDetectedSubscription(id: string): Promise<boolean> {
     const result = await db.delete(detectedSubscriptions).where(eq(detectedSubscriptions.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // User operations
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
+    return user || undefined;
+  }
+
+  async upsertUser(email: string, name?: string): Promise<User> {
+    const normalizedEmail = email.toLowerCase();
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: normalizedEmail,
+        name: name || null,
+        plan: "free",
+      })
+      .onConflictDoUpdate({
+        target: users.email,
+        set: {
+          updatedAt: drizzleSql`now()`,
+          ...(name && { name }),
+        },
+      })
+      .returning();
+    
+    return user;
+  }
+
+  // Email signup operations
+  async createEmailSignup(signup: InsertEmailSignup): Promise<EmailSignup> {
+    const [emailSignup] = await db
+      .insert(emailSignups)
+      .values({
+        email: signup.email.toLowerCase(),
+        tag: signup.tag || "waitlist",
+      })
+      .returning();
+    
+    return emailSignup;
+  }
+
+  async getEmailSignups(): Promise<EmailSignup[]> {
+    return await db.select().from(emailSignups).orderBy(desc(emailSignups.createdAt));
   }
 }
 
