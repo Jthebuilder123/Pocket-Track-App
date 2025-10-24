@@ -209,7 +209,7 @@ export function DashboardPage() {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <CreditCard className="w-6 h-6 text-primary" />
-            <h1 className="text-xl font-semibold">SubTracker</h1>
+            <h1 className="text-xl font-semibold">PocketTrack</h1>
           </div>
           <div className="flex items-center gap-2">
             {user && (

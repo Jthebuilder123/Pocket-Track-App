@@ -22,7 +22,7 @@ export const createLinkToken = async (userId: string) => {
     user: {
       client_user_id: userId,
     },
-    client_name: 'SubTracker',
+    client_name: 'PocketTrack',
     products: [Products.Transactions],
     country_codes: [CountryCode.Us],
     language: 'en',

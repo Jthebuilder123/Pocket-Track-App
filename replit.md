@@ -1,7 +1,7 @@
-# SubTracker - Subscription Management Tracker
+# PocketTrack - Subscription Management Tracker
 
 ## Overview
-SubTracker is a modern web application for tracking and managing recurring subscriptions. It helps users monitor their subscription spending, visualize costs by category, and stay on top of upcoming renewals.
+PocketTrack is a modern web application for tracking and managing recurring subscriptions. It helps users monitor their subscription spending, visualize costs by category, and stay on top of upcoming renewals.
 
 ## Features
 - **Passwordless Authentication**: Secure magic-link login via email with JWT tokens
