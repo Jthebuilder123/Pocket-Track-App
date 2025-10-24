@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal } from "lucide-react";
+import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SubscriptionCard } from "@/components/subscription-card";
 import { SubscriptionModal } from "@/components/subscription-modal";
 import { SpendingCharts } from "@/components/spending-charts";
 import { UpcomingRenewals } from "@/components/upcoming-renewals";
 import { type Subscription, SUBSCRIPTION_CATEGORIES, BILLING_CYCLES } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 export function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,6 +21,7 @@ export function DashboardPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [billingFilter, setBillingFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("name");
+  const { toast } = useToast();
 
   const { data: subscriptions = [], isLoading } = useQuery<Subscription[]>({
     queryKey: ["/api/subscriptions"],
@@ -78,6 +81,91 @@ export function DashboardPage() {
     setEditingSubscription(undefined);
   };
 
+  const escapeCsvField = (field: string): string => {
+    const escaped = field.replace(/"/g, '""');
+    return `"${escaped}"`;
+  };
+
+  const exportToCSV = () => {
+    try {
+      const headers = ["Name", "Cost", "Billing Cycle", "Category", "Next Renewal", "Status", "Notes"];
+      const csvData = activeSubscriptions.map(sub => [
+        escapeCsvField(sub.name),
+        escapeCsvField(sub.cost),
+        escapeCsvField(sub.billingCycle),
+        escapeCsvField(sub.category),
+        escapeCsvField(new Date(sub.nextRenewalDate).toISOString().split('T')[0]),
+        escapeCsvField(sub.status),
+        escapeCsvField(sub.notes || "")
+      ]);
+
+      const csvContent = [
+        headers.map(h => escapeCsvField(h)).join(","),
+        ...csvData.map(row => row.join(","))
+      ].join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `subscriptions_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Successful",
+        description: `Exported ${activeSubscriptions.length} subscriptions to CSV`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Unable to export subscriptions",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportToJSON = () => {
+    try {
+      const jsonData = activeSubscriptions.map(sub => ({
+        name: sub.name,
+        cost: parseFloat(sub.cost),
+        billingCycle: sub.billingCycle,
+        category: sub.category,
+        nextRenewalDate: new Date(sub.nextRenewalDate).toISOString(),
+        status: sub.status,
+        notes: sub.notes || "",
+        createdAt: sub.createdAt ? new Date(sub.createdAt).toISOString() : null,
+      }));
+
+      const jsonString = JSON.stringify(jsonData, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `subscriptions_${new Date().toISOString().split('T')[0]}.json`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Successful",
+        description: `Exported ${activeSubscriptions.length} subscriptions to JSON`,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Unable to export subscriptions",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -87,10 +175,30 @@ export function DashboardPage() {
             <CreditCard className="w-6 h-6 text-primary" />
             <h1 className="text-xl font-semibold">SubTracker</h1>
           </div>
-          <Button onClick={handleAddNew} data-testid="button-add-subscription">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Subscription
-          </Button>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="default" data-testid="button-export">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportToCSV} data-testid="menuitem-export-csv">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportToJSON} data-testid="menuitem-export-json">
+                  <FileJson className="w-4 h-4 mr-2" />
+                  Export as JSON
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={handleAddNew} data-testid="button-add-subscription">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Subscription
+            </Button>
+          </div>
         </div>
       </header>
 
