@@ -7,10 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SubscriptionCard } from "@/components/subscription-card";
 import { SubscriptionModal } from "@/components/subscription-modal";
 import { SpendingCharts } from "@/components/spending-charts";
 import { UpcomingRenewals } from "@/components/upcoming-renewals";
+import { BankConnect } from "@/components/bank-connect";
+import { DetectedSubscriptions } from "@/components/detected-subscriptions";
 import { type Subscription, SUBSCRIPTION_CATEGORIES, BILLING_CYCLES } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
@@ -260,17 +263,33 @@ export function DashboardPage() {
           </Card>
         </div>
 
-        {/* Charts Section */}
-        {activeSubscriptions.length > 0 && (
-          <SpendingCharts subscriptions={activeSubscriptions} />
-        )}
+        {/* Tabs for different sections */}
+        <Tabs defaultValue="subscriptions" className="mb-8">
+          <TabsList data-testid="tabs-navigation">
+            <TabsTrigger value="subscriptions" data-testid="tab-subscriptions">
+              My Subscriptions
+            </TabsTrigger>
+            <TabsTrigger value="detected" data-testid="tab-detected">
+              Detected
+            </TabsTrigger>
+            <TabsTrigger value="banks" data-testid="tab-banks">
+              Bank Connections
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Upcoming Renewals */}
-        {activeSubscriptions.length > 0 && (
-          <UpcomingRenewals subscriptions={activeSubscriptions} />
-        )}
+          {/* My Subscriptions Tab */}
+          <TabsContent value="subscriptions" className="mt-6 space-y-8">
+            {/* Charts Section */}
+            {activeSubscriptions.length > 0 && (
+              <SpendingCharts subscriptions={activeSubscriptions} />
+            )}
 
-        {/* Filters and Search */}
+            {/* Upcoming Renewals */}
+            {activeSubscriptions.length > 0 && (
+              <UpcomingRenewals subscriptions={activeSubscriptions} />
+            )}
+
+            {/* Filters and Search */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -348,57 +367,69 @@ export function DashboardPage() {
           </div>
         )}
 
-        {/* Subscriptions List */}
-        <div>
-          <h3 className="text-xl font-medium mb-4">
-            Your Subscriptions ({filteredSubscriptions.length})
-          </h3>
-          {isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="p-6">
-                  <div className="animate-pulse flex gap-4">
-                    <div className="w-12 h-12 bg-muted rounded-lg" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-muted rounded w-1/4" />
-                      <div className="h-3 bg-muted rounded w-1/6" />
-                    </div>
+            {/* Subscriptions List */}
+            <div>
+              <h3 className="text-xl font-medium mb-4">
+                Your Subscriptions ({filteredSubscriptions.length})
+              </h3>
+              {isLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="p-6">
+                      <div className="animate-pulse flex gap-4">
+                        <div className="w-12 h-12 bg-muted rounded-lg" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-muted rounded w-1/4" />
+                          <div className="h-3 bg-muted rounded w-1/6" />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : filteredSubscriptions.length === 0 ? (
+                <Card className="p-12">
+                  <div className="text-center">
+                    <CreditCard className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">
+                      {subscriptions.length === 0 ? "No subscriptions yet" : "No subscriptions found"}
+                    </h3>
+                    <p className="text-muted-foreground mb-6">
+                      {subscriptions.length === 0
+                        ? "Start tracking your recurring expenses by adding your first subscription."
+                        : "Try adjusting your filters or search query."}
+                    </p>
+                    {subscriptions.length === 0 && (
+                      <Button onClick={handleAddNew} data-testid="button-add-first">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Your First Subscription
+                      </Button>
+                    )}
                   </div>
                 </Card>
-              ))}
+              ) : (
+                <div className="space-y-4">
+                  {filteredSubscriptions.map((subscription) => (
+                    <SubscriptionCard
+                      key={subscription.id}
+                      subscription={subscription}
+                      onEdit={handleEdit}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          ) : filteredSubscriptions.length === 0 ? (
-            <Card className="p-12">
-              <div className="text-center">
-                <CreditCard className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">
-                  {subscriptions.length === 0 ? "No subscriptions yet" : "No subscriptions found"}
-                </h3>
-                <p className="text-muted-foreground mb-6">
-                  {subscriptions.length === 0
-                    ? "Start tracking your recurring expenses by adding your first subscription."
-                    : "Try adjusting your filters or search query."}
-                </p>
-                {subscriptions.length === 0 && (
-                  <Button onClick={handleAddNew} data-testid="button-add-first">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Subscription
-                  </Button>
-                )}
-              </div>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredSubscriptions.map((subscription) => (
-                <SubscriptionCard
-                  key={subscription.id}
-                  subscription={subscription}
-                  onEdit={handleEdit}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+          </TabsContent>
+
+          {/* Detected Subscriptions Tab */}
+          <TabsContent value="detected" className="mt-6">
+            <DetectedSubscriptions />
+          </TabsContent>
+
+          {/* Bank Connections Tab */}
+          <TabsContent value="banks" className="mt-6">
+            <BankConnect />
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Modal */}
