@@ -1,7 +1,10 @@
-import { Pencil, Trash2, Calendar, DollarSign } from "lucide-react";
+import { useState } from "react";
+import { Pencil, Trash2, Calendar, Ban, History } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { SubscriptionHistoryDialog } from "./subscription-history-dialog";
 
 interface SubscriptionCardProps {
   subscription: Subscription;
@@ -25,6 +29,8 @@ interface SubscriptionCardProps {
 
 export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps) {
   const { toast } = useToast();
+  const [cancelReason, setCancelReason] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -42,6 +48,27 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
         variant: "destructive",
         title: "Error",
         description: "Failed to delete subscription. Please try again.",
+      });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (reason?: string) => {
+      await apiRequest("POST", `/api/subscriptions/${subscription.id}/cancel`, { reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
+      toast({
+        title: "Subscription cancelled",
+        description: `${subscription.name} has been cancelled.`,
+      });
+      setCancelReason("");
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to cancel subscription. Please try again.",
       });
     },
   });
@@ -110,7 +137,7 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
             )}
 
             {/* Actions */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -120,6 +147,60 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
                 <Pencil className="w-3.5 h-3.5 mr-1.5" />
                 Edit
               </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHistory(true)}
+                data-testid={`button-history-${subscription.id}`}
+              >
+                <History className="w-3.5 h-3.5 mr-1.5" />
+                History
+              </Button>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid={`button-cancel-${subscription.id}`}
+                  >
+                    <Ban className="w-3.5 h-3.5 mr-1.5" />
+                    Cancel
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cancel Subscription</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to cancel "{subscription.name}"? You can optionally provide a reason below.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="py-4">
+                    <Label htmlFor="cancel-reason" className="text-sm font-medium mb-2 block">
+                      Reason (optional)
+                    </Label>
+                    <Input
+                      id="cancel-reason"
+                      placeholder="e.g., Too expensive, Not using it anymore"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      data-testid="input-cancel-reason"
+                    />
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-cancel">Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => cancelMutation.mutate(cancelReason || undefined)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      data-testid="button-confirm-cancel"
+                    >
+                      Cancel Subscription
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -135,7 +216,7 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Subscription</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete "{subscription.name}"? This action cannot be undone.
+                      Are you sure you want to permanently delete "{subscription.name}"? This action cannot be undone and will remove all history.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -154,6 +235,13 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
           </div>
         </div>
       </CardContent>
+
+      <SubscriptionHistoryDialog
+        open={showHistory}
+        onClose={() => setShowHistory(false)}
+        subscriptionId={subscription.id}
+        subscriptionName={subscription.name}
+      />
     </Card>
   );
 }

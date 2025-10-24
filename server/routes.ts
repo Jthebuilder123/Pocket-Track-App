@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSubscriptionSchema } from "@shared/schema";
+import { insertSubscriptionSchema, cancelSubscriptionSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -78,6 +78,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting subscription:", error);
       res.status(500).json({ error: "Failed to delete subscription" });
+    }
+  });
+
+  // Cancel subscription
+  app.post("/api/subscriptions/:id/cancel", async (req, res) => {
+    try {
+      const result = cancelSubscriptionSchema.safeParse(req.body);
+      if (!result.success) {
+        const errorMessage = fromZodError(result.error).toString();
+        return res.status(400).json({ error: errorMessage });
+      }
+
+      const subscription = await storage.cancelSubscription(req.params.id, result.data.reason);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      res.json(subscription);
+    } catch (error) {
+      console.error("Error cancelling subscription:", error);
+      res.status(500).json({ error: "Failed to cancel subscription" });
+    }
+  });
+
+  // Get subscription history
+  app.get("/api/subscriptions/:id/history", async (req, res) => {
+    try {
+      const history = await storage.getSubscriptionHistory(req.params.id);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching subscription history:", error);
+      res.status(500).json({ error: "Failed to fetch subscription history" });
     }
   });
 

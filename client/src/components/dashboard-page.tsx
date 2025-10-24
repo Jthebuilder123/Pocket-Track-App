@@ -24,8 +24,9 @@ export function DashboardPage() {
     queryKey: ["/api/subscriptions"],
   });
 
-  // Calculate statistics
-  const monthlyTotal = subscriptions.reduce((sum, sub) => {
+  // Calculate statistics (only for active subscriptions)
+  const activeSubscriptions = subscriptions.filter(sub => sub.status === "active");
+  const monthlyTotal = activeSubscriptions.reduce((sum, sub) => {
     const cost = parseFloat(sub.cost);
     if (sub.billingCycle === "Monthly") return sum + cost;
     if (sub.billingCycle === "Quarterly") return sum + cost / 3;
@@ -34,14 +35,15 @@ export function DashboardPage() {
   }, 0);
 
   const annualTotal = monthlyTotal * 12;
-  const activeCount = subscriptions.length;
+  const activeCount = activeSubscriptions.length;
 
-  // Filter and sort subscriptions
+  // Filter and sort subscriptions (only show active ones by default)
   let filteredSubscriptions = subscriptions.filter((sub) => {
     const matchesSearch = sub.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === "all" || sub.category === categoryFilter;
     const matchesBilling = billingFilter === "all" || sub.billingCycle === billingFilter;
-    return matchesSearch && matchesCategory && matchesBilling;
+    const isActive = sub.status === "active";
+    return matchesSearch && matchesCategory && matchesBilling && isActive;
   });
 
   filteredSubscriptions = [...filteredSubscriptions].sort((a, b) => {
@@ -151,13 +153,13 @@ export function DashboardPage() {
         </div>
 
         {/* Charts Section */}
-        {subscriptions.length > 0 && (
-          <SpendingCharts subscriptions={subscriptions} />
+        {activeSubscriptions.length > 0 && (
+          <SpendingCharts subscriptions={activeSubscriptions} />
         )}
 
         {/* Upcoming Renewals */}
-        {subscriptions.length > 0 && (
-          <UpcomingRenewals subscriptions={subscriptions} />
+        {activeSubscriptions.length > 0 && (
+          <UpcomingRenewals subscriptions={activeSubscriptions} />
         )}
 
         {/* Filters and Search */}

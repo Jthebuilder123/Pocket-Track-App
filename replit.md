@@ -63,6 +63,8 @@ All endpoints prefixed with `/api`:
 - `POST /api/subscriptions` - Create new subscription
 - `PUT /api/subscriptions/:id` - Update subscription
 - `DELETE /api/subscriptions/:id` - Delete subscription
+- `POST /api/subscriptions/:id/cancel` - Cancel subscription with optional reason
+- `GET /api/subscriptions/:id/history` - Get subscription history
 
 ### Design System
 - **Primary Color**: Blue (hsl(220, 90%, 56%))
@@ -90,6 +92,8 @@ All endpoints prefixed with `/api`:
   - Fixed form dependency issues for proper edit flow
   - Comprehensive end-to-end testing completed successfully
   - All TypeScript errors resolved
+  - **Database Persistence**: Migrated from in-memory to PostgreSQL storage
+  - **Subscription History & Cancellation**: Added status tracking, cancellation workflow with reasons, and complete audit history for all subscription changes
 
 ## Development
 - **Start**: Run `npm run dev` (automatically configured)

@@ -11,6 +11,22 @@ export const subscriptions = pgTable("subscriptions", {
   category: text("category").notNull(),
   nextRenewalDate: timestamp("next_renewal_date").notNull(),
   notes: text("notes"),
+  status: text("status").notNull().default("active"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancellationReason: text("cancellation_reason"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const subscriptionHistory = pgTable("subscription_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  subscriptionId: varchar("subscription_id").notNull(),
+  action: text("action").notNull(),
+  previousStatus: text("previous_status"),
+  newStatus: text("new_status"),
+  previousCost: decimal("previous_cost", { precision: 10, scale: 2 }),
+  newCost: decimal("new_cost", { precision: 10, scale: 2 }),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
 export const insertSubscriptionSchema = createInsertSchema(subscriptions, {
@@ -28,6 +44,10 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions, {
   ),
 }).omit({
   id: true,
+  status: true,
+  cancelledAt: true,
+  cancellationReason: true,
+  createdAt: true,
 });
 
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
@@ -47,3 +67,19 @@ export const SUBSCRIPTION_CATEGORIES = [
 ] as const;
 
 export const BILLING_CYCLES = ["Monthly", "Quarterly", "Yearly"] as const;
+
+export const SUBSCRIPTION_STATUSES = ["active", "cancelled"] as const;
+
+// History schema
+export const insertHistorySchema = createInsertSchema(subscriptionHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertHistory = z.infer<typeof insertHistorySchema>;
+export type SubscriptionHistory = typeof subscriptionHistory.$inferSelect;
+
+// Cancellation schema
+export const cancelSubscriptionSchema = z.object({
+  reason: z.string().optional(),
+});
