@@ -5,15 +5,57 @@ import { insertSubscriptionSchema, cancelSubscriptionSchema } from "@shared/sche
 import { fromZodError } from "zod-validation-error";
 import { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getInstitution } from "./plaid";
 import { z } from "zod";
+import logger from "./logger";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint
+  app.get("/healthz", async (_req, res) => {
+    res.status(200).json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    });
+  });
+
+  // Diagnostics endpoint
+  app.get("/diagnostics", async (_req, res) => {
+    try {
+      // Check database connection
+      const subscriptions = await storage.getAllSubscriptions();
+      const dbStatus = "connected";
+      
+      res.status(200).json({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || "development",
+        database: {
+          status: dbStatus,
+          subscriptionCount: subscriptions.length
+        },
+        memory: {
+          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+          unit: "MB"
+        }
+      });
+    } catch (error) {
+      logger.error("Diagnostics check failed", { error });
+      res.status(503).json({
+        status: "degraded",
+        timestamp: new Date().toISOString(),
+        error: "Database connection failed"
+      });
+    }
+  });
+
   // Get all subscriptions
   app.get("/api/subscriptions", async (_req, res) => {
     try {
       const subscriptions = await storage.getAllSubscriptions();
       res.json(subscriptions);
     } catch (error) {
-      console.error("Error fetching subscriptions:", error);
+      logger.error("Error fetching subscriptions", { error });
       res.status(500).json({ error: "Failed to fetch subscriptions" });
     }
   });
@@ -27,7 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(subscription);
     } catch (error) {
-      console.error("Error fetching subscription:", error);
+      logger.error("Error fetching subscription", { error, subscriptionId: req.params.id });
       res.status(500).json({ error: "Failed to fetch subscription" });
     }
   });
@@ -44,7 +86,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subscription = await storage.createSubscription(result.data);
       res.status(201).json(subscription);
     } catch (error) {
-      console.error("Error creating subscription:", error);
+      logger.error("Error creating subscription", { error });
       res.status(500).json({ error: "Failed to create subscription" });
     }
   });
@@ -64,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(subscription);
     } catch (error) {
-      console.error("Error updating subscription:", error);
+      logger.error("Error updating subscription", { error, subscriptionId: req.params.id });
       res.status(500).json({ error: "Failed to update subscription" });
     }
   });
@@ -78,7 +120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.status(204).send();
     } catch (error) {
-      console.error("Error deleting subscription:", error);
+      logger.error("Error deleting subscription", { error, subscriptionId: req.params.id });
       res.status(500).json({ error: "Failed to delete subscription" });
     }
   });
@@ -98,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json(subscription);
     } catch (error) {
-      console.error("Error cancelling subscription:", error);
+      logger.error("Error cancelling subscription", { error, subscriptionId: req.params.id });
       res.status(500).json({ error: "Failed to cancel subscription" });
     }
   });
@@ -109,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const history = await storage.getSubscriptionHistory(req.params.id);
       res.json(history);
     } catch (error) {
-      console.error("Error fetching subscription history:", error);
+      logger.error("Error fetching subscription history", { error, subscriptionId: req.params.id });
       res.status(500).json({ error: "Failed to fetch subscription history" });
     }
   });
@@ -123,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const linkToken = await createLinkToken(userId);
       res.json({ link_token: linkToken });
     } catch (error) {
-      console.error("Error creating link token:", error);
+      logger.error("Error creating link token", { error });
       res.status(500).json({ error: "Failed to create link token" });
     }
   });
@@ -161,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(connection);
     } catch (error) {
-      console.error("Error exchanging token:", error);
+      logger.error("Error exchanging token", { error });
       res.status(500).json({ error: "Failed to exchange token" });
     }
   });
@@ -172,7 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const connections = await storage.getAllBankConnections();
       res.json(connections);
     } catch (error) {
-      console.error("Error fetching bank connections:", error);
+      logger.error("Error fetching bank connections", { error });
       res.status(500).json({ error: "Failed to fetch bank connections" });
     }
   });
@@ -205,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         detectedSubscriptions: detectedSubs.length 
       });
     } catch (error) {
-      console.error("Error syncing transactions:", error);
+      logger.error("Error syncing transactions", { error, connectionId: req.params.id });
       res.status(500).json({ error: "Failed to sync transactions" });
     }
   });
@@ -216,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const detected = await storage.getDetectedSubscriptions();
       res.json(detected);
     } catch (error) {
-      console.error("Error fetching detected subscriptions:", error);
+      logger.error("Error fetching detected subscriptions", { error });
       res.status(500).json({ error: "Failed to fetch detected subscriptions" });
     }
   });
@@ -251,7 +293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(subscription);
     } catch (error) {
-      console.error("Error confirming detected subscription:", error);
+      logger.error("Error confirming detected subscription", { error, detectedId: req.params.id });
       res.status(500).json({ error: "Failed to confirm subscription" });
     }
   });
@@ -265,7 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.status(204).send();
     } catch (error) {
-      console.error("Error dismissing detected subscription:", error);
+      logger.error("Error dismissing detected subscription", { error, detectedId: req.params.id });
       res.status(500).json({ error: "Failed to dismiss subscription" });
     }
   });
@@ -279,9 +321,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.status(204).send();
     } catch (error) {
-      console.error("Error deleting bank connection:", error);
+      logger.error("Error deleting bank connection", { error, connectionId: req.params.id });
       res.status(500).json({ error: "Failed to delete bank connection" });
     }
+  });
+
+  // 404 handler for API routes
+  app.use("/api/*", (_req, res) => {
+    res.status(404).json({ 
+      error: "Not Found",
+      message: "The requested API endpoint does not exist"
+    });
+  });
+
+  // Global error handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    logger.error("Unhandled error", { 
+      error: err,
+      path: req.path,
+      method: req.method,
+      stack: err.stack
+    });
+
+    // Don't expose internal error details in production
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    const statusCode = err.statusCode || err.status || 500;
+
+    res.status(statusCode).json({
+      error: err.message || "Internal Server Error",
+      ...(isDevelopment && { stack: err.stack, details: err })
+    });
   });
 
   const httpServer = createServer(app);
