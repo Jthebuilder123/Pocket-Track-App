@@ -154,6 +154,20 @@ All endpoints prefixed with `/api`:
     - Detection features: confidence scoring, merchant categorization, billing cycle identification
     - Fixed API contract alignment between frontend and backend (snake_case for Plaid fields)
     - Complete end-to-end testing verified: bank connection, transaction sync, subscription detection, confirmation flow
+  - **Production Readiness**: Added enterprise-grade production features
+    - Health check endpoints: `/healthz` and `/diagnostics` with database health monitoring
+    - Structured logging with Winston (JSON output in production, colorized in development)
+    - Environment variable validation for all API keys (PLAID_CLIENT_ID, PLAID_SECRET, DATABASE_URL)
+    - Global error handling middleware with proper 400-500 status codes
+    - Production-safe error responses (no stack traces exposed)
+    - Dependency optimization (removed 22 unused packages)
+
+## Production Features
+- **Health Monitoring**: `/healthz` for basic health checks, `/diagnostics` for detailed system status
+- **Structured Logging**: Winston-based logging with environment-specific formatting
+- **Error Handling**: Global middleware for 404s and unhandled errors with request context logging
+- **Security**: All sensitive credentials in environment variables with validation
+- **Optimized**: Clean dependency tree with only necessary packages
 
 ## Development
 - **Start**: Run `npm run dev` (automatically configured)
