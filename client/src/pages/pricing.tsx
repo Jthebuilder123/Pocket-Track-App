@@ -158,7 +158,7 @@ export default function Pricing() {
         </div>
         {billingInterval === "yearly" && (
           <p className="text-sm text-primary font-medium">
-            Save up to 21% with yearly billing
+            Save up to 38% with yearly billing
           </p>
         )}
       </div>

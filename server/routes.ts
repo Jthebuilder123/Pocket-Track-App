@@ -842,7 +842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 name: `${plan.name} Plan`,
                 description: plan.description,
               },
-              unit_amount: amount * 100, // Convert to cents
+              unit_amount: Math.round(amount * 100), // Convert to cents
               recurring: {
                 interval: billingInterval === "monthly" ? "month" : "year",
               },

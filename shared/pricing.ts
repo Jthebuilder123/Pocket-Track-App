@@ -76,9 +76,9 @@ export const PLANS: PlanDetails[] = [
   {
     id: PRICING_TIERS.ESSENTIALS,
     name: "Essentials",
-    monthlyPrice: 9,
-    yearlyPrice: 84, // $7/mo when paid yearly (17% discount)
-    yearlyMonthlyEquivalent: 7,
+    monthlyPrice: 4.99,
+    yearlyPrice: 39, // $3.25/mo when paid yearly (35% discount)
+    yearlyMonthlyEquivalent: 3.25,
     description: "For individuals managing multiple subscriptions",
     features: PLAN_FEATURES.essentials,
     popular: true,
@@ -86,9 +86,9 @@ export const PLANS: PlanDetails[] = [
   {
     id: PRICING_TIERS.PRO,
     name: "Pro",
-    monthlyPrice: 19,
-    yearlyPrice: 180, // $15/mo when paid yearly (21% discount)
-    yearlyMonthlyEquivalent: 15,
+    monthlyPrice: 7.99,
+    yearlyPrice: 59, // $4.92/mo when paid yearly (38% discount)
+    yearlyMonthlyEquivalent: 4.92,
     description: "For power users who need unlimited tracking and integrations",
     features: PLAN_FEATURES.pro,
   },

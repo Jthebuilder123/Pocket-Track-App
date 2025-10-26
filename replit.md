@@ -4,6 +4,7 @@
 PocketTrack is a modern web application designed to help users efficiently track and manage their recurring subscriptions. It provides tools for monitoring spending, visualizing costs by category, and staying informed about upcoming renewals. The project aims to offer a comprehensive solution for personal finance management focused on subscription services.
 
 ## Recent Changes (October 26, 2025)
+- **Pricing Update**: Reduced pricing to be more accessible - Essentials now $4.99/mo ($39/yr, save 35%), Pro now $7.99/mo ($59/yr, save 38%). Pricing changes automatically apply via dynamic Stripe checkout sessions.
 - **Page Flickering Fix**: Fixed infinite request loop caused by catch-all route using `window.location.replace()`. Changed to wouter's `Redirect` component for smooth client-side navigation.
 - **Plaid Error Handling**: Improved error handling for missing Plaid credentials. Server no longer crashes when `PLAID_CLIENT_ID` and `PLAID_SECRET` are missing - instead shows clear error message.
 - **Deployment Documentation**: Added comprehensive guide for configuring environment variables in published deployments, especially Plaid credentials.
@@ -51,6 +52,8 @@ The system is built with a clear separation of concerns between client and serve
   - Production requires Plaid production credentials for real bank connections
 - **Stripe**: Payment processing for subscription plans with webhook-based plan activation.
   - Requires `STRIPE_SECRET_KEY` environment variable
+  - Pricing is defined in `shared/pricing.ts` and dynamically created in Stripe checkout sessions
+  - No manual Stripe product/price configuration needed - prices are created on-the-fly via Stripe's price_data API
 - **PostgreSQL**: Relational database for all application data storage with proper multi-tenant isolation.
 - **SendGrid**: (Configurable) for email delivery of magic links and notifications.
   - Requires `SENDGRID_API_KEY` environment variable (optional)
@@ -87,7 +90,7 @@ The application implements a three-tier pricing model with strict feature enforc
 - No email notifications
 - No webhook integrations
 
-### Essentials Tier ($9/month or $84/year)
+### Essentials Tier ($4.99/month or $39/year)
 - 25 active subscriptions maximum
 - 1 bank connection
 - Full analytics dashboard
@@ -96,8 +99,9 @@ The application implements a three-tier pricing model with strict feature enforc
 - Email notifications
 - No webhook integrations
 - Most popular tier
+- Save 35% with yearly billing
 
-### Pro Tier ($19/month or $180/year)
+### Pro Tier ($7.99/month or $59/year)
 - Unlimited subscriptions
 - Unlimited bank connections (up to 5)
 - Advanced analytics
@@ -106,6 +110,7 @@ The application implements a three-tier pricing model with strict feature enforc
 - Email notifications
 - Webhook integrations
 - Priority support
+- Save 38% with yearly billing
 
 All feature limits are enforced at the API level via middleware that verifies user plan and current usage. Multi-tenant data isolation ensures users can only access their own subscriptions and bank connections.
 
