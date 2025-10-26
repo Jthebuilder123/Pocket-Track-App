@@ -1,31 +1,39 @@
 import { Request, Response, NextFunction } from "express";
-import { verifySessionToken } from "./auth";
 import logger from "./logger";
 
-export interface AuthRequest extends Request {
-  user?: {
+// Replit Auth user structure (via Passport.js)
+export interface ReplitAuthUser {
+  claims: {
+    sub: string;
     email: string;
+    first_name?: string;
+    last_name?: string;
+    profile_image_url?: string;
+    exp?: number;
   };
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+}
+
+export interface AuthRequest extends Request {
+  user?: ReplitAuthUser;
 }
 
 /**
- * Middleware to protect routes - requires authentication
+ * Middleware to protect routes - requires Replit Auth authentication
  */
 export function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
-  const token = req.cookies?.session;
-
-  if (!token) {
+  if (!req.user || !req.user.claims || !req.user.claims.sub) {
+    logger.warn("Unauthorized access attempt", { 
+      hasUser: !!req.user, 
+      hasClaims: !!(req.user?.claims),
+      hasSub: !!(req.user?.claims?.sub)
+    });
     return res.status(401).json({ error: "Authentication required" });
   }
 
-  const payload = verifySessionToken(token);
-  
-  if (!payload) {
-    res.clearCookie("session");
-    return res.status(401).json({ error: "Invalid or expired session" });
-  }
-
-  req.user = { email: payload.email };
+  // User is authenticated via Replit Auth
   next();
 }
 
@@ -33,14 +41,7 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
  * Middleware to optionally load user if authenticated
  */
 export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
-  const token = req.cookies?.session;
-
-  if (token) {
-    const payload = verifySessionToken(token);
-    if (payload) {
-      req.user = { email: payload.email };
-    }
-  }
-
+  // User will be loaded by Passport if session exists
+  // No action needed, just pass through
   next();
 }
