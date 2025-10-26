@@ -32,8 +32,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   type Subscription,
-  type InsertSubscription,
-  insertSubscriptionSchema,
+  type InsertSubscriptionClient,
+  insertSubscriptionSchemaClient,
   SUBSCRIPTION_CATEGORIES,
   BILLING_CYCLES,
 } from "@shared/schema";
@@ -48,8 +48,8 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
   const { toast } = useToast();
   const isEditing = !!subscription;
 
-  const form = useForm<InsertSubscription>({
-    resolver: zodResolver(insertSubscriptionSchema),
+  const form = useForm<InsertSubscriptionClient>({
+    resolver: zodResolver(insertSubscriptionSchemaClient),
     defaultValues: {
       name: "",
       cost: "",
@@ -83,7 +83,7 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
   }, [subscription, open]);
 
   const saveMutation = useMutation({
-    mutationFn: async (data: InsertSubscription) => {
+    mutationFn: async (data: InsertSubscriptionClient) => {
       if (isEditing) {
         await apiRequest("PUT", `/api/subscriptions/${subscription.id}`, data);
       } else {
@@ -101,16 +101,29 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
       onClose();
       form.reset();
     },
-    onError: () => {
+    onError: (error: any) => {
+      // Better error handling with specific messages
+      let errorMessage = "Failed to save subscription. Please try again.";
+      
+      if (error?.message?.includes("Authentication") || error?.message?.includes("401")) {
+        errorMessage = "You must be logged in to add subscriptions. Please log in first.";
+      } else if (error?.message?.includes("limit reached") || error?.message?.includes("403")) {
+        errorMessage = "Subscription limit reached for your plan. Please upgrade to add more subscriptions.";
+      } else if (error?.message?.includes("Access denied")) {
+        errorMessage = "You don't have permission to edit this subscription.";
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to save subscription. Please try again.",
+        description: errorMessage,
       });
     },
   });
 
-  const onSubmit = (data: InsertSubscription) => {
+  const onSubmit = (data: InsertSubscriptionClient) => {
     saveMutation.mutate(data);
   };
 

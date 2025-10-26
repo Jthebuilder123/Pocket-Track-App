@@ -35,6 +35,7 @@ export const subscriptionHistory = pgTable("subscription_history", {
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
+// Backend schema - includes userId (added by server)
 export const insertSubscriptionSchema = createInsertSchema(subscriptions, {
   userId: z.string(),
   cost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
@@ -61,7 +62,13 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions, {
   createdAt: true,
 });
 
+// Client schema - excludes userId (added by backend automatically)
+export const insertSubscriptionSchemaClient = insertSubscriptionSchema.omit({
+  userId: true,
+});
+
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+export type InsertSubscriptionClient = z.infer<typeof insertSubscriptionSchemaClient>;
 export type Subscription = typeof subscriptions.$inferSelect;
 
 // Categories for filtering
