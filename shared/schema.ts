@@ -14,6 +14,11 @@ export const subscriptions = pgTable("subscriptions", {
   status: text("status").notNull().default("active"),
   cancelledAt: timestamp("cancelled_at"),
   cancellationReason: text("cancellation_reason"),
+  // Cancel Helper fields
+  cancellationUrl: text("cancellation_url"),
+  supportEmail: text("support_email"),
+  supportPhone: text("support_phone"),
+  cancellationSteps: text("cancellation_steps"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
 
@@ -147,3 +152,58 @@ export const insertEmailSignupSchema = createInsertSchema(emailSignups).omit({
 
 export type EmailSignup = typeof emailSignups.$inferSelect;
 export type InsertEmailSignup = z.infer<typeof insertEmailSignupSchema>;
+
+// Webhook configurations
+export const webhooks = pgTable("webhooks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  events: text("events").array().notNull(), // ['subscription.created', 'subscription.cancelled', etc.]
+  secret: text("secret"),
+  enabled: text("enabled").notNull().default("true"),
+  lastTriggeredAt: timestamp("last_triggered_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertWebhookSchema = createInsertSchema(webhooks, {
+  url: z.string().url("Must be a valid URL"),
+  events: z.array(z.string()).min(1, "Select at least one event"),
+}).omit({
+  id: true,
+  lastTriggeredAt: true,
+  createdAt: true,
+});
+
+export type Webhook = typeof webhooks.$inferSelect;
+export type InsertWebhook = z.infer<typeof insertWebhookSchema>;
+
+// Notification preferences
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  emailRenewalReminders: text("email_renewal_reminders").notNull().default("true"),
+  reminderDaysBefore: text("reminder_days_before").notNull().default("7"),
+  weeklyDigest: text("weekly_digest").notNull().default("false"),
+  cancelConfirmations: text("cancel_confirmations").notNull().default("true"),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+});
+
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+
+// Webhook events enum
+export const WEBHOOK_EVENTS = [
+  "subscription.created",
+  "subscription.updated",
+  "subscription.cancelled",
+  "subscription.renewed",
+  "bank.connected",
+  "bank.synced",
+] as const;
