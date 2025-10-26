@@ -4,6 +4,7 @@
 PocketTrack is a modern web application designed to help users efficiently track and manage their recurring subscriptions. It provides tools for monitoring spending, visualizing costs by category, and staying informed about upcoming renewals. The project aims to offer a comprehensive solution for personal finance management focused on subscription services.
 
 ## Recent Changes (October 26, 2025)
+- **PWA Conversion**: Converted PocketTrack into a Progressive Web App (PWA) with full offline support and installability on iOS/Android devices. Added web app manifest, service worker with caching strategy, app icons (192x192, 512x512, 180x180), and iOS-specific meta tags for standalone mode. No app logic was modified - only PWA infrastructure added.
 - **Pricing Update**: Reduced pricing to be more accessible - Essentials now $4.99/mo ($39/yr, save 35%), Pro now $7.99/mo ($59/yr, save 38%). Pricing changes automatically apply via dynamic Stripe checkout sessions.
 - **Feature Limits Expanded**: Free tier now includes 10 subscriptions (up from 5), 1 bank connection (up from 0), and data import capability. Essentials tier now includes 3 bank connections (up from 1).
 - **Page Flickering Fix**: Fixed infinite request loop caused by catch-all route using `window.location.replace()`. Changed to wouter's `Redirect` component for smooth client-side navigation.
@@ -115,6 +116,49 @@ The application implements a three-tier pricing model with strict feature enforc
 - Save 38% with yearly billing
 
 All feature limits are enforced at the API level via middleware that verifies user plan and current usage. Multi-tenant data isolation ensures users can only access their own subscriptions and bank connections.
+
+## Progressive Web App (PWA) Features
+
+PocketTrack is now a full-featured Progressive Web App that can be installed on your device for an app-like experience.
+
+### PWA Features
+- **Offline Support**: Service worker caches essential assets for offline functionality
+- **Installable**: Add to home screen on iOS, Android, and desktop browsers
+- **Standalone Mode**: Runs like a native app without browser chrome
+- **Fast Loading**: Cached assets load instantly on repeat visits
+- **App Icons**: Custom icons for all platforms (192x192, 512x512, 180x180)
+
+### Installation Instructions
+
+#### iOS (iPhone/iPad)
+1. Open PocketTrack in Safari (must use Safari, not Chrome)
+2. Tap the Share button (square with arrow pointing up)
+3. Scroll down and tap "Add to Home Screen"
+4. Tap "Add" in the top-right corner
+5. The app icon will appear on your home screen
+6. Open from home screen for standalone experience
+
+#### Android
+1. Open PocketTrack in Chrome
+2. Tap the three-dot menu in the top-right
+3. Select "Add to Home screen" or "Install app"
+4. Tap "Install" in the popup
+5. The app icon will appear on your home screen
+6. Open from home screen for standalone experience
+
+#### Desktop (Chrome, Edge, Brave)
+1. Open PocketTrack in your browser
+2. Look for the install icon in the address bar (+ or computer icon)
+3. Click the install button
+4. Click "Install" in the popup
+5. The app will open in its own window
+
+### PWA Technical Implementation
+- **Manifest**: `/manifest.json` defines app metadata, icons, and display mode
+- **Service Worker**: `/sw.js` handles caching and offline support
+- **Caching Strategy**: Network-first for API calls, cache-first for static assets
+- **iOS Support**: Apple-specific meta tags for standalone mode and custom status bar
+- **All Changes Documented**: Every PWA change marked with `# PWA:` comments
 
 ## Integration Notes
 - **Google Calendar**: Integration available via Replit connector (connector:ccfg_google-calendar_DDDBAC03DE404369B74F32E78D) but not currently set up. Can be configured in the future to sync subscription renewal dates to calendar events.
