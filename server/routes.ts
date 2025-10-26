@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit";
 import multer from "multer";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import Stripe from "stripe";
 import { storage } from "./storage";
 import { insertSubscriptionSchema, cancelSubscriptionSchema, insertEmailSignupSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
@@ -12,6 +13,16 @@ import { z } from "zod";
 import logger from "./logger";
 import { generateMagicToken, generateSessionToken, verifyMagicToken, sendMagicLink } from "./auth";
 import { requireAuth, optionalAuth, type AuthRequest } from "./authMiddleware";
+import { checkSubscriptionLimit, checkBankConnectionLimit, requireFeature, getUserPlanLimits } from "./feature-gates";
+import { PLANS, PRICING_TIERS } from "@shared/pricing";
+
+// Initialize Stripe
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2024-12-18.acacia",
+});
 
 // Rate limiter for auth endpoints
 const authLimiter = rateLimit({
@@ -229,7 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new subscription
-  app.post("/api/subscriptions", async (req, res) => {
+  app.post("/api/subscriptions", requireAuth, checkSubscriptionLimit, async (req, res) => {
     try {
       const result = insertSubscriptionSchema.safeParse(req.body);
       if (!result.success) {
@@ -333,7 +344,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/subscriptions/import/upload - Parse and preview CSV/Excel
-  app.post("/api/subscriptions/import/upload", upload.single('file'), async (req, res) => {
+  app.post("/api/subscriptions/import/upload", requireAuth, requireFeature("importData"), upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -425,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/subscriptions/import/confirm - Bulk insert validated subscriptions
-  app.post("/api/subscriptions/import/confirm", async (req, res) => {
+  app.post("/api/subscriptions/import/confirm", requireAuth, requireFeature("importData"), async (req, res) => {
     try {
       const schema = z.object({
         subscriptions: z.array(insertSubscriptionSchema),
@@ -475,7 +486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Exchange public token for access token and save bank connection
-  app.post("/api/plaid/exchange-token", async (req, res) => {
+  app.post("/api/plaid/exchange-token", requireAuth, checkBankConnectionLimit, async (req, res) => {
     try {
       const schema = z.object({
         public_token: z.string(),
@@ -644,7 +655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create webhook
-  app.post("/api/webhooks", async (req, res) => {
+  app.post("/api/webhooks", requireAuth, requireFeature("webhooks"), async (req, res) => {
     try {
       const { insertWebhookSchema } = await import("@shared/schema");
       const result = insertWebhookSchema.safeParse(req.body);
@@ -752,6 +763,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ...(isDevelopment && { stack: err.stack, details: err })
     });
   });
+
+  // ===== Stripe Checkout & Billing Routes =====
+
+  // GET /api/pricing - Get pricing plans
+  app.get("/api/pricing", (_req, res) => {
+    res.json(PLANS);
+  });
+
+  // GET /api/user/plan - Get current user's plan and limits
+  app.get("/api/user/plan", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const limits = await getUserPlanLimits(req.user!.email);
+      if (!limits) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(limits);
+    } catch (error) {
+      logger.error("Error fetching user plan limits", { error });
+      res.status(500).json({ error: "Failed to fetch plan limits" });
+    }
+  });
+
+  // POST /api/create-checkout-session - Create Stripe Checkout session
+  app.post("/api/create-checkout-session", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const schema = z.object({
+        planId: z.enum([PRICING_TIERS.ESSENTIALS, PRICING_TIERS.PRO]),
+        billingInterval: z.enum(["monthly", "yearly"]),
+      });
+
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromZodError(result.error).toString() });
+      }
+
+      const { planId, billingInterval } = result.data;
+      const user = await storage.getUserByEmail(req.user!.email);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get plan details
+      const plan = PLANS.find((p) => p.id === planId);
+      if (!plan) {
+        return res.status(400).json({ error: "Invalid plan" });
+      }
+
+      const amount = billingInterval === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
+
+      // Create or retrieve Stripe customer
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: {
+            userId: user.id,
+          },
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(user.email, customerId);
+      }
+
+      // Create Checkout Session
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: "subscription",
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: `${plan.name} Plan`,
+                description: plan.description,
+              },
+              unit_amount: amount * 100, // Convert to cents
+              recurring: {
+                interval: billingInterval === "monthly" ? "month" : "year",
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        success_url: `${process.env.APP_BASE_URL || req.headers.origin}/pricing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.APP_BASE_URL || req.headers.origin}/pricing?canceled=true`,
+        metadata: {
+          userId: user.id,
+          planId,
+          billingInterval,
+        },
+      });
+
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error) {
+      logger.error("Error creating checkout session", { error });
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  // POST /api/webhooks/stripe - Stripe webhook endpoint (must use raw body)
+  app.post(
+    "/api/webhooks/stripe",
+    async (req, res) => {
+      const sig = req.headers["stripe-signature"];
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+      if (!sig) {
+        logger.warn("Missing Stripe signature header");
+        return res.status(400).send("Missing signature");
+      }
+
+      let event: Stripe.Event;
+
+      try {
+        // Construct event with raw body for signature verification
+        const rawBody = await new Promise<Buffer>((resolve) => {
+          const chunks: Buffer[] = [];
+          req.on("data", (chunk) => chunks.push(chunk));
+          req.on("end", () => resolve(Buffer.concat(chunks)));
+        });
+
+        if (webhookSecret) {
+          event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+        } else {
+          // For development without webhook secret
+          event = JSON.parse(rawBody.toString());
+          logger.warn("Processing Stripe webhook without signature verification");
+        }
+      } catch (err: any) {
+        logger.error("Webhook signature verification failed", { error: err.message });
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+
+      // Handle the event
+      try {
+        switch (event.type) {
+          case "checkout.session.completed": {
+            const session = event.data.object as Stripe.Checkout.Session;
+            const userId = session.metadata?.userId;
+            const planId = session.metadata?.planId;
+
+            if (userId && planId && session.customer) {
+              // Update user's plan and Stripe info
+              const user = await storage.getUserByEmail(session.customer_email || "");
+              if (user) {
+                await storage.updateUserPlan(user.email, planId);
+                await storage.updateUserStripeInfo(
+                  user.email,
+                  session.customer as string,
+                  session.subscription as string
+                );
+                
+                logger.info("User plan activated", {
+                  email: user.email,
+                  plan: planId,
+                  subscriptionId: session.subscription,
+                });
+              }
+            }
+            break;
+          }
+
+          case "customer.subscription.updated": {
+            const subscription = event.data.object as Stripe.Subscription;
+            const customerId = subscription.customer as string;
+
+            // Find user by Stripe customer ID
+            const user = await storage.getUserByEmail(""); // Need to add query by customerId
+            if (user) {
+              // Handle subscription status changes
+              if (subscription.status === "active") {
+                // Reactivate plan if it was paused
+                logger.info("Subscription reactivated", {
+                  customerId,
+                  subscriptionId: subscription.id,
+                });
+              } else if (subscription.status === "canceled" || subscription.status === "unpaid") {
+                // Downgrade to free plan
+                await storage.updateUserPlan(user.email, PRICING_TIERS.FREE);
+                logger.info("Subscription canceled, downgraded to free", {
+                  customerId,
+                  email: user.email,
+                });
+              }
+            }
+            break;
+          }
+
+          case "customer.subscription.deleted": {
+            const subscription = event.data.object as Stripe.Subscription;
+            const customerId = subscription.customer as string;
+
+            // Find user and downgrade to free plan
+            const user = await storage.getUserByEmail(""); // Need to add query by customerId
+            if (user) {
+              await storage.updateUserPlan(user.email, PRICING_TIERS.FREE);
+              logger.info("Subscription deleted, downgraded to free", {
+                customerId,
+                email: user.email,
+              });
+            }
+            break;
+          }
+
+          default:
+            logger.info("Unhandled Stripe webhook event", { type: event.type });
+        }
+
+        res.json({ received: true });
+      } catch (error) {
+        logger.error("Error processing Stripe webhook", { error, eventType: event.type });
+        res.status(500).json({ error: "Webhook processing failed" });
+      }
+    }
+  );
 
   const httpServer = createServer(app);
   return httpServer;

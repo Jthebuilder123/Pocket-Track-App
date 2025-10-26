@@ -1,0 +1,119 @@
+// Pricing tier definitions for PocketTrack
+
+export const PRICING_TIERS = {
+  FREE: "free",
+  ESSENTIALS: "essentials",
+  PRO: "pro",
+} as const;
+
+export type PricingTier = typeof PRICING_TIERS[keyof typeof PRICING_TIERS];
+
+export interface PlanFeatures {
+  maxSubscriptions: number | null; // null = unlimited
+  maxBankConnections: number | null;
+  exportData: boolean;
+  importData: boolean;
+  analytics: boolean;
+  webhooks: boolean;
+  cancelHelper: boolean;
+  emailNotifications: boolean;
+}
+
+export interface PlanDetails {
+  id: PricingTier;
+  name: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  yearlyMonthlyEquivalent: number;
+  description: string;
+  features: PlanFeatures;
+  popular?: boolean;
+}
+
+export const PLAN_FEATURES: Record<PricingTier, PlanFeatures> = {
+  free: {
+    maxSubscriptions: 5,
+    maxBankConnections: 0,
+    exportData: false,
+    importData: false,
+    analytics: true,
+    webhooks: false,
+    cancelHelper: true,
+    emailNotifications: false,
+  },
+  essentials: {
+    maxSubscriptions: 25,
+    maxBankConnections: 1,
+    exportData: true,
+    importData: true,
+    analytics: true,
+    webhooks: false,
+    cancelHelper: true,
+    emailNotifications: true,
+  },
+  pro: {
+    maxSubscriptions: null, // unlimited
+    maxBankConnections: null, // unlimited
+    exportData: true,
+    importData: true,
+    analytics: true,
+    webhooks: true,
+    cancelHelper: true,
+    emailNotifications: true,
+  },
+};
+
+export const PLANS: PlanDetails[] = [
+  {
+    id: PRICING_TIERS.FREE,
+    name: "Free",
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    yearlyMonthlyEquivalent: 0,
+    description: "Perfect for getting started with subscription tracking",
+    features: PLAN_FEATURES.free,
+  },
+  {
+    id: PRICING_TIERS.ESSENTIALS,
+    name: "Essentials",
+    monthlyPrice: 9,
+    yearlyPrice: 84, // $7/mo when paid yearly (17% discount)
+    yearlyMonthlyEquivalent: 7,
+    description: "For individuals managing multiple subscriptions",
+    features: PLAN_FEATURES.essentials,
+    popular: true,
+  },
+  {
+    id: PRICING_TIERS.PRO,
+    name: "Pro",
+    monthlyPrice: 19,
+    yearlyPrice: 180, // $15/mo when paid yearly (21% discount)
+    yearlyMonthlyEquivalent: 15,
+    description: "For power users who need unlimited tracking and integrations",
+    features: PLAN_FEATURES.pro,
+  },
+];
+
+// Helper function to check if a feature is available for a plan
+export function hasFeature(plan: PricingTier, feature: keyof PlanFeatures): boolean {
+  return PLAN_FEATURES[plan][feature] === true;
+}
+
+// Helper function to check if a limit is reached
+export function isLimitReached(
+  plan: PricingTier,
+  limitType: "maxSubscriptions" | "maxBankConnections",
+  currentCount: number
+): boolean {
+  const limit = PLAN_FEATURES[plan][limitType];
+  if (limit === null) return false; // unlimited
+  return currentCount >= limit;
+}
+
+// Helper function to get limit value
+export function getLimit(
+  plan: PricingTier,
+  limitType: "maxSubscriptions" | "maxBankConnections"
+): number | null {
+  return PLAN_FEATURES[plan][limitType];
+}

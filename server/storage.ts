@@ -34,6 +34,8 @@ export interface IStorage {
   // User operations
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(email: string, name?: string): Promise<User>;
+  updateUserPlan(email: string, plan: string): Promise<User | undefined>;
+  updateUserStripeInfo(email: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User | undefined>;
   
   // Email signup operations
   createEmailSignup(signup: InsertEmailSignup): Promise<EmailSignup>;
@@ -376,6 +378,34 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return user;
+  }
+
+  async updateUserPlan(email: string, plan: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ plan, updatedAt: drizzleSql`now()` })
+      .where(eq(users.email, email.toLowerCase()))
+      .returning();
+    
+    return user || undefined;
+  }
+
+  async updateUserStripeInfo(
+    email: string,
+    stripeCustomerId: string,
+    stripeSubscriptionId?: string
+  ): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        stripeCustomerId,
+        ...(stripeSubscriptionId && { stripeSubscriptionId }),
+        updatedAt: drizzleSql`now()`,
+      })
+      .where(eq(users.email, email.toLowerCase()))
+      .returning();
+    
+    return user || undefined;
   }
 
   // Email signup operations
