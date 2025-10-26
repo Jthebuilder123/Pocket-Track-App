@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -37,12 +37,9 @@ function Router() {
           <Route path="/" component={DashboardPage} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/click-test" component={ClickTest} />
-          {/* FIX: Use proper wouter catch-all syntax - routes without path match everything not matched above */}
+          {/* FIX: Use wouter Redirect for catch-all to prevent hard page reloads that cause flickering */}
           <Route>
-            {() => {
-              window.location.replace('/');
-              return null;
-            }}
+            <Redirect to="/" />
           </Route>
         </>
       )}
