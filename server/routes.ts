@@ -11,7 +11,7 @@ import { fromZodError } from "zod-validation-error";
 import { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getInstitution } from "./plaid";
 import { z } from "zod";
 import logger from "./logger";
-import { generateMagicToken, generateSessionToken, verifyMagicToken, sendMagicLink } from "./auth";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { requireAuth, optionalAuth, type AuthRequest } from "./authMiddleware";
 import { checkSubscriptionLimit, checkBankConnectionLimit, requireFeature, getUserPlanLimits } from "./feature-gates";
 import { PLANS, PRICING_TIERS } from "@shared/pricing";
@@ -34,6 +34,9 @@ const authLimiter = rateLimit({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup Replit Auth (Google OAuth + Email/Password)
+  await setupAuth(app);
+
   // Health check endpoint
   app.get("/healthz", async (_req, res) => {
     res.status(200).json({ 
@@ -83,113 +86,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== Authentication Routes =====
+  // Auth routes are now handled by setupAuth() (Google OAuth + Email/Password via Replit Auth)
+  // Available routes:
+  // - GET /api/login - Initiates OAuth flow
+  // - GET /api/callback - OAuth callback
+  // - GET /api/logout - Logs out and redirects
 
-  // POST /api/auth/login - Request magic link
+  // GET /api/auth/user - Get authenticated user
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      logger.error("Error fetching user:", { error });
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Legacy magic link endpoints - redirect to new auth
   app.post("/api/auth/login", authLimiter, async (req, res) => {
-    try {
-      const schema = z.object({
-        email: z.string().email(),
-        next: z.string().optional(),
-      });
-
-      const result = schema.safeParse(req.body);
-      if (!result.success) {
-        return res.status(400).json({ error: fromZodError(result.error).toString() });
-      }
-
-      const { email, next } = result.data;
-      const normalizedEmail = email.toLowerCase();
-
-      // Store email in EmailSignup table
-      await storage.createEmailSignup({
-        email: normalizedEmail,
-        tag: "app_login",
-      });
-
-      // Generate magic link token
-      const token = generateMagicToken(normalizedEmail);
-
-      // Send magic link
-      await sendMagicLink(normalizedEmail, token, next);
-
-      res.json({ ok: true, message: "Magic link sent to your email" });
-    } catch (error) {
-      logger.error("Error sending magic link", { error });
-      res.status(500).json({ error: "Failed to send magic link" });
-    }
+    // Redirect to new OAuth login
+    res.status(301).json({ 
+      error: "Authentication method changed. Please use the login button.",
+      redirect: "/api/login"
+    });
   });
 
-  // GET /api/auth/magic - Verify magic link and log in
   app.get("/api/auth/magic", authLimiter, async (req, res) => {
-    try {
-      const token = req.query.token as string;
-      let next = (req.query.next as string) || "/";
-
-      if (!token) {
-        return res.redirect(`/login?error=${encodeURIComponent("Missing token")}`);
-      }
-
-      // Validate next parameter to prevent open redirects
-      // Only allow same-origin relative paths
-      if (next && (!next.startsWith("/") || next.startsWith("//"))) {
-        logger.warn("Invalid redirect attempt blocked", { next });
-        next = "/";
-      }
-
-      const payload = verifyMagicToken(token);
-      
-      if (!payload) {
-        return res.redirect(`/login?error=${encodeURIComponent("Invalid or expired link")}`);
-      }
-
-      // Upsert user
-      await storage.upsertUser(payload.email);
-
-      // Generate session token
-      const sessionToken = generateSessionToken(payload.email);
-
-      // Set httpOnly cookie
-      res.cookie("session", sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
-      });
-
-      logger.info("User logged in", { email: payload.email });
-      res.redirect(next);
-    } catch (error) {
-      logger.error("Error verifying magic link", { error });
-      res.redirect(`/login?error=${encodeURIComponent("Authentication failed")}`);
-    }
+    // Redirect to new OAuth login
+    res.redirect("/api/login");
   });
 
-  // POST /api/auth/logout - Clear session
-  app.post("/api/auth/logout", (req, res) => {
-    res.clearCookie("session");
-    res.json({ ok: true });
-  });
-
-  // GET /api/auth/me - Get current user
-  app.get("/api/auth/me", optionalAuth, async (req: AuthRequest, res) => {
-    if (!req.user) {
-      return res.status(401).json({ error: "Not authenticated" });
-    }
-
+  // GET /api/auth/me - Get current user (for backwards compatibility)
+  app.get("/api/auth/me", isAuthenticated, async (req: any, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user.email);
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
       if (!user) {
-        res.clearCookie("session");
-        return res.status(401).json({ error: "User not found" });
+        return res.status(404).json({ error: "User not found" });
       }
-
       res.json({
+        id: user.id,
         email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profileImageUrl: user.profileImageUrl,
         plan: user.plan,
-        name: user.name,
       });
     } catch (error) {
-      logger.error("Error fetching user", { error });
+      logger.error("Error fetching current user", { error });
       res.status(500).json({ error: "Failed to fetch user" });
     }
   });
