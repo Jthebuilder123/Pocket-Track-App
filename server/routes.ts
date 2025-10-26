@@ -630,6 +630,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Webhook Routes =====
+
+  // Get all webhooks
+  app.get("/api/webhooks", async (_req, res) => {
+    try {
+      const webhooks = await storage.getAllWebhooks();
+      res.json(webhooks);
+    } catch (error) {
+      logger.error("Error fetching webhooks", { error });
+      res.status(500).json({ error: "Failed to fetch webhooks" });
+    }
+  });
+
+  // Create webhook
+  app.post("/api/webhooks", async (req, res) => {
+    try {
+      const { insertWebhookSchema } = await import("@shared/schema");
+      const result = insertWebhookSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromZodError(result.error).toString() });
+      }
+
+      const webhook = await storage.createWebhook(result.data);
+      res.status(201).json(webhook);
+    } catch (error) {
+      logger.error("Error creating webhook", { error });
+      res.status(500).json({ error: "Failed to create webhook" });
+    }
+  });
+
+  // Update webhook
+  app.put("/api/webhooks/:id", async (req, res) => {
+    try {
+      const { insertWebhookSchema } = await import("@shared/schema");
+      const result = insertWebhookSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromZodError(result.error).toString() });
+      }
+
+      const webhook = await storage.updateWebhook(req.params.id, result.data);
+      if (!webhook) {
+        return res.status(404).json({ error: "Webhook not found" });
+      }
+      res.json(webhook);
+    } catch (error) {
+      logger.error("Error updating webhook", { error, webhookId: req.params.id });
+      res.status(500).json({ error: "Failed to update webhook" });
+    }
+  });
+
+  // Delete webhook
+  app.delete("/api/webhooks/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteWebhook(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Webhook not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      logger.error("Error deleting webhook", { error, webhookId: req.params.id });
+      res.status(500).json({ error: "Failed to delete webhook" });
+    }
+  });
+
+  // ===== Notification Preferences Routes =====
+
+  // Get notification preferences
+  app.get("/api/notification-preferences", async (_req, res) => {
+    try {
+      const userId = "user-default"; // TODO: Get from auth context
+      const prefs = await storage.getNotificationPreferences(userId);
+      res.json(prefs || { userId, emailRenewalReminders: "true", reminderDaysBefore: "7", weeklyDigest: "false", cancelConfirmations: "true" });
+    } catch (error) {
+      logger.error("Error fetching notification preferences", { error });
+      res.status(500).json({ error: "Failed to fetch notification preferences" });
+    }
+  });
+
+  // Update notification preferences
+  app.put("/api/notification-preferences", async (req, res) => {
+    try {
+      const userId = "user-default"; // TODO: Get from auth context
+      const { insertNotificationPreferencesSchema } = await import("@shared/schema");
+      const result = insertNotificationPreferencesSchema.safeParse({ ...req.body, userId });
+      if (!result.success) {
+        return res.status(400).json({ error: fromZodError(result.error).toString() });
+      }
+
+      const prefs = await storage.upsertNotificationPreferences(result.data);
+      res.json(prefs);
+    } catch (error) {
+      logger.error("Error updating notification preferences", { error });
+      res.status(500).json({ error: "Failed to update notification preferences" });
+    }
+  });
+
   // 404 handler for API routes
   app.use("/api/*", (_req, res) => {
     res.status(404).json({ 

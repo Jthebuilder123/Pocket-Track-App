@@ -1,7 +1,8 @@
-import { type Subscription, type InsertSubscription, type InsertHistory, type SubscriptionHistory, type BankConnection, type DetectedSubscription, type InsertDetectedSubscription, type User, type EmailSignup, type InsertEmailSignup, subscriptions, subscriptionHistory, bankConnections, detectedSubscriptions, users, emailSignups } from "@shared/schema";
+import { type Subscription, type InsertSubscription, type InsertHistory, type SubscriptionHistory, type BankConnection, type DetectedSubscription, type InsertDetectedSubscription, type User, type EmailSignup, type InsertEmailSignup, type Webhook, type InsertWebhook, type NotificationPreferences, type InsertNotificationPreferences, subscriptions, subscriptionHistory, bankConnections, detectedSubscriptions, users, emailSignups, webhooks, notificationPreferences } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql as drizzleSql } from "drizzle-orm";
 import type { Transaction } from "plaid";
+import { triggerWebhooks } from "./webhook-service";
 
 export interface IStorage {
   // Subscription operations
@@ -37,6 +38,18 @@ export interface IStorage {
   // Email signup operations
   createEmailSignup(signup: InsertEmailSignup): Promise<EmailSignup>;
   getEmailSignups(): Promise<EmailSignup[]>;
+  
+  // Webhook operations
+  getAllWebhooks(): Promise<Webhook[]>;
+  getWebhook(id: string): Promise<Webhook | undefined>;
+  createWebhook(webhook: InsertWebhook): Promise<Webhook>;
+  updateWebhook(id: string, webhook: InsertWebhook): Promise<Webhook | undefined>;
+  deleteWebhook(id: string): Promise<boolean>;
+  updateWebhookLastTriggered(id: string): Promise<void>;
+  
+  // Notification preferences operations
+  getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined>;
+  upsertNotificationPreferences(prefs: InsertNotificationPreferences): Promise<NotificationPreferences>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -71,6 +84,11 @@ export class DatabaseStorage implements IStorage {
       newCost: subscription.cost,
       metadata: JSON.stringify({ name: subscription.name }),
     });
+    
+    // Trigger webhooks (fire and forget)
+    this.getAllWebhooks().then((webhooks) => {
+      triggerWebhooks("subscription.created", { subscription }, webhooks).catch(() => {});
+    }).catch(() => {});
     
     return subscription;
   }
@@ -110,6 +128,11 @@ export class DatabaseStorage implements IStorage {
         newCost: existing.cost !== subscription.cost ? subscription.cost : null,
         metadata: JSON.stringify({ changes }),
       });
+      
+      // Trigger webhooks (fire and forget)
+      this.getAllWebhooks().then((webhooks) => {
+        triggerWebhooks("subscription.updated", { subscription }, webhooks).catch(() => {});
+      }).catch(() => {});
     }
     
     return subscription || undefined;
@@ -157,6 +180,11 @@ export class DatabaseStorage implements IStorage {
         newStatus: "cancelled",
         metadata: reason ? JSON.stringify({ reason }) : null,
       });
+      
+      // Trigger webhooks (fire and forget)
+      this.getAllWebhooks().then((webhooks) => {
+        triggerWebhooks("subscription.cancelled", { subscription: cancelled }, webhooks).catch(() => {});
+      }).catch(() => {});
     }
 
     return cancelled || undefined;
@@ -365,6 +393,66 @@ export class DatabaseStorage implements IStorage {
 
   async getEmailSignups(): Promise<EmailSignup[]> {
     return await db.select().from(emailSignups).orderBy(desc(emailSignups.createdAt));
+  }
+
+  // Webhook operations
+  async getAllWebhooks(): Promise<Webhook[]> {
+    return await db.select().from(webhooks).orderBy(desc(webhooks.createdAt));
+  }
+
+  async getWebhook(id: string): Promise<Webhook | undefined> {
+    const [webhook] = await db.select().from(webhooks).where(eq(webhooks.id, id));
+    return webhook || undefined;
+  }
+
+  async createWebhook(insertWebhook: InsertWebhook): Promise<Webhook> {
+    const [webhook] = await db.insert(webhooks).values(insertWebhook).returning();
+    return webhook;
+  }
+
+  async updateWebhook(id: string, insertWebhook: InsertWebhook): Promise<Webhook | undefined> {
+    const [webhook] = await db
+      .update(webhooks)
+      .set(insertWebhook)
+      .where(eq(webhooks.id, id))
+      .returning();
+    return webhook || undefined;
+  }
+
+  async deleteWebhook(id: string): Promise<boolean> {
+    const result = await db.delete(webhooks).where(eq(webhooks.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async updateWebhookLastTriggered(id: string): Promise<void> {
+    await db
+      .update(webhooks)
+      .set({ lastTriggeredAt: drizzleSql`now()` })
+      .where(eq(webhooks.id, id));
+  }
+
+  // Notification preferences operations
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined> {
+    const [prefs] = await db
+      .select()
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+    return prefs || undefined;
+  }
+
+  async upsertNotificationPreferences(insertPrefs: InsertNotificationPreferences): Promise<NotificationPreferences> {
+    const [prefs] = await db
+      .insert(notificationPreferences)
+      .values(insertPrefs)
+      .onConflictDoUpdate({
+        target: notificationPreferences.userId,
+        set: {
+          ...insertPrefs,
+          updatedAt: drizzleSql`now()`,
+        },
+      })
+      .returning();
+    return prefs;
   }
 }
 

@@ -47,6 +47,10 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions, {
     },
     z.date()
   ),
+  cancellationUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  supportEmail: z.string().email("Must be a valid email").optional().or(z.literal("")),
+  supportPhone: z.string().optional(),
+  cancellationSteps: z.string().optional(),
 }).omit({
   id: true,
   status: true,

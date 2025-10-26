@@ -1,218 +1,36 @@
 # PocketTrack - Subscription Management Tracker
 
 ## Overview
-PocketTrack is a modern web application for tracking and managing recurring subscriptions. It helps users monitor their subscription spending, visualize costs by category, and stay on top of upcoming renewals.
-
-## Features
-- **Passwordless Authentication**: Secure magic-link login via email with JWT tokens
-- **Dashboard**: Overview of all subscriptions with monthly/annual totals
-- **Subscription Management**: Add, edit, and delete subscriptions
-- **Visual Analytics**: Charts showing spending by category and billing frequency
-- **Upcoming Renewals**: Timeline view of subscriptions due for renewal
-- **Filtering & Sorting**: Search and filter subscriptions by category, billing cycle, or renewal date
-- **Responsive Design**: Beautiful UI that works on desktop, tablet, and mobile
-- **Database Persistence**: PostgreSQL storage for data persistence across sessions
-- **History Tracking**: Complete audit trail of subscription changes
-- **Cancellation**: Cancel subscriptions with optional reasons
-- **Data Export**: Export subscriptions to CSV or JSON formats
-- **Bank Integration**: Connect bank accounts via Plaid to automatically detect subscriptions
-- **Auto-Detection**: Smart algorithm identifies recurring charges from transaction history
-- **Detection Review**: Review and confirm detected subscriptions before adding to your list
-
-## Project Architecture
-
-### Tech Stack
-- **Frontend**: React 18 with TypeScript, Wouter for routing
-- **UI Components**: Shadcn UI with Tailwind CSS
-- **Charts**: Recharts for data visualization
-- **Backend**: Express.js with TypeScript
-- **Database**: PostgreSQL via Drizzle ORM
-- **Bank Integration**: Plaid API for secure bank connectivity
-- **State Management**: TanStack Query (React Query)
-- **Form Handling**: React Hook Form with Zod validation
-
-### Data Model
-**User Entity**:
-- `id`: Auto-incrementing identifier
-- `email`: User email address (unique)
-- `createdAt`: Account creation timestamp
-
-**Email Signup Entity**:
-- `id`: Auto-incrementing identifier
-- `email`: Email address
-- `token`: JWT magic link token
-- `tag`: Purpose tag ("app_login" or "waitlist")
-- `createdAt`: Request timestamp
-
-**Subscription Entity**:
-- `id`: Unique identifier (UUID)
-- `name`: Subscription service name
-- `cost`: Subscription cost (decimal)
-- `billingCycle`: "Monthly", "Quarterly", or "Yearly"
-- `category`: Category (Streaming, Software, Cloud Storage, etc.)
-- `nextRenewalDate`: Next renewal date (timestamp)
-- `notes`: Optional notes
-- `status`: "active" or "cancelled"
-- `cancelledAt`, `cancellationReason`: Cancellation tracking
-
-**Bank Connection Entity**:
-- `id`: Unique identifier
-- `accessToken`: Encrypted Plaid access token
-- `itemId`: Plaid item identifier
-- `institutionName`: Bank/financial institution name
-- `lastSyncedAt`: Last transaction sync timestamp
-
-**Detected Subscription Entity**:
-- `id`: Unique identifier
-- `merchantName`: Detected merchant name
-- `estimatedCost`: Calculated average cost
-- `detectedBillingCycle`: Identified billing frequency
-- `category`: Auto-categorized type
-- `transactionIds`: List of matching transaction IDs
-- `confidence`: Detection confidence score (50-99%)
-- `status`: "pending" or "confirmed"
-
-### Project Structure
-```
-client/
-├── src/
-│   ├── components/
-│   │   ├── ui/                       # Shadcn UI components
-│   │   ├── dashboard-page.tsx        # Main dashboard with tabs
-│   │   ├── subscription-card.tsx     # Individual subscription display
-│   │   ├── subscription-modal.tsx    # Add/Edit subscription form
-│   │   ├── spending-charts.tsx       # Data visualization charts
-│   │   ├── upcoming-renewals.tsx     # Upcoming renewal timeline
-│   │   ├── bank-connect.tsx          # Plaid bank connection UI
-│   │   └── detected-subscriptions.tsx # Auto-detected subscriptions review
-│   ├── pages/
-│   │   ├── login.tsx                 # Passwordless login page
-│   │   └── not-found.tsx             # 404 page
-│   ├── lib/
-│   │   └── queryClient.ts            # React Query setup
-│   ├── App.tsx                       # Main app component
-│   └── index.css                     # Global styles
-├── index.html                        # HTML entry point
-shared/
-└── schema.ts                         # Shared types, Zod schemas, Drizzle tables
-server/
-├── routes.ts                         # API routes (subscriptions + Plaid + auth)
-├── storage.ts                        # Storage interface and database operations
-├── auth.ts                           # JWT token generation, magic link emails
-├── authMiddleware.ts                 # Auth middleware (requireAuth, optionalAuth)
-├── logger.ts                         # Winston logger configuration
-├── plaid.ts                          # Plaid API client configuration
-└── db.ts                             # Database connection
-```
-
-### API Endpoints
-All endpoints prefixed with `/api`:
-
-**Authentication Endpoints**:
-- `POST /api/auth/login` - Request magic link (expects: email, next?)
-- `GET /api/auth/magic` - Verify magic link and create session (query: token, next?)
-- `POST /api/auth/logout` - Clear session cookie
-- `GET /api/auth/me` - Get current authenticated user
-- `POST /api/signup` - Waitlist signup (expects: email)
-
-**Subscription Endpoints**:
-- `GET /api/subscriptions` - Get all subscriptions
-- `POST /api/subscriptions` - Create new subscription
-- `PUT /api/subscriptions/:id` - Update subscription
-- `DELETE /api/subscriptions/:id` - Delete subscription
-- `POST /api/subscriptions/:id/cancel` - Cancel subscription with optional reason
-- `GET /api/subscriptions/:id/history` - Get subscription history
-
-**Plaid Integration Endpoints**:
-- `POST /api/plaid/create-link-token` - Generate Plaid Link token for bank connection
-- `POST /api/plaid/exchange-token` - Exchange public token for access token (expects: public_token, institution_id, institution_name, accounts)
-- `GET /api/bank-connections` - Get all connected bank accounts
-- `POST /api/bank-connections/:id/sync` - Sync and analyze transactions from bank
-- `DELETE /api/bank-connections/:id` - Disconnect bank account
-- `GET /api/detected-subscriptions` - Get pending detected subscriptions
-- `POST /api/detected-subscriptions/:id/confirm` - Confirm and convert to subscription
-- `DELETE /api/detected-subscriptions/:id` - Dismiss detected subscription
-
-### Design System
-- **Primary Color**: Blue (hsl(220, 90%, 56%))
-- **Font**: Inter for UI, system fonts for fallback
-- **Spacing**: Consistent 6-unit padding for cards, 4-unit gaps for lists
-- **Components**: Shadcn UI with custom theming
-- **Interactions**: Hover elevations, smooth transitions
-
-### Key User Flows
-1. **Login**: Navigate to homepage → Click "Login" button → Enter email → Click magic link in email
-2. **Logout**: Click "Logout" button in header → Redirected to login page
-3. **Add Subscription Manually**: Click "Add Subscription" → Fill form → Save
-4. **Edit Subscription**: Click "Edit" on card → Modify → Update
-5. **Delete Subscription**: Click "Delete" → Confirm → Remove
-6. **Cancel Subscription**: Click "Cancel" → Add reason (optional) → Confirm
-7. **View History**: Click "History" → See complete audit trail of changes
-8. **Export Data**: Click "Export" → Choose CSV or JSON → Download file
-9. **Filter Subscriptions**: Use search bar or category/billing filters
-10. **View Analytics**: Dashboard shows charts and upcoming renewals automatically
-11. **Connect Bank**: Navigate to "Bank Connections" tab → Click "Connect Bank" → Select institution via Plaid Link
-12. **Sync Transactions**: Click "Sync Transactions" on connected bank → System analyzes last 90 days
-13. **Review Detected**: Navigate to "Detected" tab → Review auto-detected subscriptions with confidence scores
-14. **Confirm Detection**: Click "Confirm & Add" to add detected subscription, or "Edit Before Adding" to modify details first
-
-## Recent Changes
-- **2025-10-24**: Complete implementation of subscription management tracker with Plaid bank integration
-  - Created data models for subscriptions with Zod validation
-  - Built all React components with Shadcn UI following design guidelines
-  - Implemented responsive dashboard layout with stats cards
-  - Added Recharts-based charts for spending visualization
-  - Created upcoming renewals timeline with time period grouping
-  - Implemented complete backend API with CRUD operations
-  - Added date preprocessing for seamless frontend-backend integration
-  - Fixed form dependency issues for proper edit flow
-  - Comprehensive end-to-end testing completed successfully
-  - All TypeScript errors resolved
-  - **Database Persistence**: Migrated from in-memory to PostgreSQL storage
-  - **Subscription History & Cancellation**: Added status tracking, cancellation workflow with reasons, and complete audit history for all subscription changes
-  - **Plaid Bank Integration**: Fully integrated Plaid API for secure bank account connectivity
-    - Extended database schema with bank_connections and detected_subscriptions tables
-    - Built backend Plaid integration (link token, token exchange, transaction sync)
-    - Implemented subscription detection algorithm analyzing recurring charges
-    - Created BankConnect component with react-plaid-link for connection UI
-    - Created DetectedSubscriptions component for reviewing auto-detected subscriptions
-    - Added tabbed interface to dashboard: "My Subscriptions", "Detected", "Bank Connections"
-    - Detection features: confidence scoring, merchant categorization, billing cycle identification
-    - Fixed API contract alignment between frontend and backend (snake_case for Plaid fields)
-    - Complete end-to-end testing verified: bank connection, transaction sync, subscription detection, confirmation flow
-  - **Production Readiness**: Added enterprise-grade production features
-    - Health check endpoints: `/healthz` and `/diagnostics` with database health monitoring
-    - Structured logging with Winston (JSON output in production, colorized in development)
-    - Environment variable validation for all API keys (PLAID_CLIENT_ID, PLAID_SECRET, DATABASE_URL)
-    - Global error handling middleware with proper 400-500 status codes
-    - Production-safe error responses (no stack traces exposed)
-    - Dependency optimization (removed 22 unused packages)
-  - **Passwordless Authentication**: Implemented secure magic-link email authentication
-    - Extended database schema with users and email_signups tables using Drizzle ORM
-    - Created auth service with JWT token generation/validation (15-minute expiration)
-    - Integrated SendGrid for email delivery (with console fallback for development)
-    - Built React login page with email input form and success states
-    - Added rate limiting (10 requests/minute on auth endpoints)
-    - Created auth middleware (requireAuth, optionalAuth) for protected routes
-    - Implemented session management with secure httpOnly cookies (14-day expiration)
-    - Fixed critical open-redirect vulnerability in magic link handler by validating redirect parameters to only allow same-origin relative paths
-    - Complete end-to-end testing verified: login flow, magic link validation, session management, rate limiting, and open redirect protection
-
-## Production Features
-- **Health Monitoring**: `/healthz` for basic health checks, `/diagnostics` for detailed system status
-- **Structured Logging**: Winston-based logging with environment-specific formatting
-- **Error Handling**: Global middleware for 404s and unhandled errors with request context logging
-- **Security**: All sensitive credentials in environment variables with validation
-- **Optimized**: Clean dependency tree with only necessary packages
-
-## Development
-- **Start**: Run `npm run dev` (automatically configured)
-- **Storage**: PostgreSQL database via Drizzle ORM
-- **Styling**: Tailwind CSS with design tokens in index.css
-- **Database**: `npm run db:push` to sync schema changes
+PocketTrack is a modern web application designed to help users efficiently track and manage their recurring subscriptions. It provides tools for monitoring spending, visualizing costs by category, and staying informed about upcoming renewals. The project aims to offer a comprehensive solution for personal finance management focused on subscription services.
 
 ## User Preferences
 - Clean, modern SaaS dashboard aesthetic
 - Linear + Notion inspired design
 - Focus on clarity and information density
 - Smooth, purposeful interactions
+
+## System Architecture
+
+### UI/UX Decisions
+The application features a responsive design built with React and Shadcn UI, styled using Tailwind CSS. It utilizes Recharts for data visualization, presenting spending analytics by category and billing frequency, and a timeline view for upcoming renewals. The design emphasizes clarity, information density, and smooth interactions, inspired by modern SaaS dashboards like Linear and Notion.
+
+### Technical Implementations
+- **Frontend**: React 18 with TypeScript, Wouter for routing, TanStack Query for state management, and React Hook Form with Zod for form handling.
+- **Backend**: Express.js with TypeScript, providing a robust API for all functionalities.
+- **Database**: PostgreSQL with Drizzle ORM for persistent data storage.
+- **Authentication**: Passwordless magic-link login via email, secured with JWT tokens.
+- **Plaid Integration**: Secure bank connectivity via the Plaid API for automatic subscription detection from transaction history.
+- **Key Features**:
+    - Comprehensive subscription lifecycle management (add, edit, delete, cancel).
+    - Visual analytics dashboard.
+    - Export and import functionalities (CSV/JSON).
+    - Webhook system for external integrations and notification preferences for renewal reminders.
+    - Audit trail for subscription changes.
+
+### System Design Choices
+The system is built with a clear separation of concerns between client and server. Shared types and schemas are centralized. Authentication includes rate limiting and secure session management. Production readiness features include health monitoring, structured logging, robust error handling, and environment variable validation for security.
+
+## External Dependencies
+- **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection.
+- **PostgreSQL**: Relational database for all application data storage.
+- **SendGrid**: (Configurable) for email delivery of magic links and notifications.
