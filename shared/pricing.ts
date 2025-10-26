@@ -32,10 +32,10 @@ export interface PlanDetails {
 
 export const PLAN_FEATURES: Record<PricingTier, PlanFeatures> = {
   free: {
-    maxSubscriptions: 5,
-    maxBankConnections: 0,
+    maxSubscriptions: 10,
+    maxBankConnections: 1,
     exportData: false,
-    importData: false,
+    importData: true,
     analytics: true,
     webhooks: false,
     cancelHelper: true,
@@ -43,7 +43,7 @@ export const PLAN_FEATURES: Record<PricingTier, PlanFeatures> = {
   },
   essentials: {
     maxSubscriptions: 25,
-    maxBankConnections: 1,
+    maxBankConnections: 3,
     exportData: true,
     importData: true,
     analytics: true,

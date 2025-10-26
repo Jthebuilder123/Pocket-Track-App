@@ -5,6 +5,7 @@ PocketTrack is a modern web application designed to help users efficiently track
 
 ## Recent Changes (October 26, 2025)
 - **Pricing Update**: Reduced pricing to be more accessible - Essentials now $4.99/mo ($39/yr, save 35%), Pro now $7.99/mo ($59/yr, save 38%). Pricing changes automatically apply via dynamic Stripe checkout sessions.
+- **Feature Limits Expanded**: Free tier now includes 10 subscriptions (up from 5), 1 bank connection (up from 0), and data import capability. Essentials tier now includes 3 bank connections (up from 1).
 - **Page Flickering Fix**: Fixed infinite request loop caused by catch-all route using `window.location.replace()`. Changed to wouter's `Redirect` component for smooth client-side navigation.
 - **Plaid Error Handling**: Improved error handling for missing Plaid credentials. Server no longer crashes when `PLAID_CLIENT_ID` and `PLAID_SECRET` are missing - instead shows clear error message.
 - **Deployment Documentation**: Added comprehensive guide for configuring environment variables in published deployments, especially Plaid credentials.
@@ -82,17 +83,18 @@ When you publish your app, environment variables from development are NOT automa
 The application implements a three-tier pricing model with strict feature enforcement:
 
 ### Free Tier ($0/month)
-- 5 active subscriptions maximum
-- 0 bank connections
+- 10 active subscriptions maximum
+- 1 bank connection
 - Basic analytics dashboard
 - Cancellation helper
-- No data import/export
+- Data import (CSV/Excel)
+- No data export
 - No email notifications
 - No webhook integrations
 
 ### Essentials Tier ($4.99/month or $39/year)
 - 25 active subscriptions maximum
-- 1 bank connection
+- 3 bank connections
 - Full analytics dashboard
 - Cancellation helper
 - CSV/JSON export and import
