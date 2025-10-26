@@ -434,10 +434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/subscriptions/import/confirm - Bulk insert validated subscriptions
   app.post("/api/subscriptions/import/confirm", requireAuth, requireFeature("importData"), async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const userId = req.user!.claims.sub;
 
       const schema = z.object({
         subscriptions: z.array(insertSubscriptionSchema),
@@ -457,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Insert all subscriptions with userId
       const createdSubscriptions = [];
       for (const subData of subscriptionsToImport) {
-        const created = await storage.createSubscription({ ...subData, userId: user.id });
+        const created = await storage.createSubscription({ ...subData, userId });
         createdSubscriptions.push(created);
       }
 
@@ -489,10 +486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Exchange public token for access token and save bank connection
   app.post("/api/plaid/exchange-token", requireAuth, checkBankConnectionLimit, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const userId = req.user!.claims.sub;
 
       const schema = z.object({
         public_token: z.string(),
@@ -514,7 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { accessToken, itemId } = await exchangePublicToken(public_token);
       
       const connection = await storage.createBankConnection({
-        userId: user.id,
+        userId,
         institutionId: institution_id,
         institutionName: institution_name,
         accessToken,
@@ -533,12 +527,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all bank connections
   app.get("/api/bank-connections", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const userId = req.user!.claims.sub;
 
-      const connections = await storage.getBankConnectionsByUserId(user.id);
+      const connections = await storage.getBankConnectionsByUserId(userId);
       res.json(connections);
     } catch (error) {
       logger.error("Error fetching bank connections", { error });
@@ -549,16 +540,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sync transactions and detect subscriptions
   app.post("/api/bank-connections/:id/sync", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const userId = req.user!.claims.sub;
 
       const connection = await storage.getBankConnection(req.params.id);
       if (!connection) {
         return res.status(404).json({ error: "Bank connection not found" });
       }
-      if (connection.userId !== user.id) {
+      if (connection.userId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -650,17 +638,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete bank connection
   app.delete("/api/bank-connections/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const userId = req.user!.claims.sub;
 
       // Verify ownership
       const existing = await storage.getBankConnection(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Bank connection not found" });
       }
-      if (existing.userId !== user.id) {
+      if (existing.userId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -781,7 +766,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/user/plan - Get current user's plan and limits
   app.get("/api/user/plan", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const limits = await getUserPlanLimits(req.user!.email);
+      const userId = req.user!.claims.sub;
+      const limits = await getUserPlanLimits(userId);
       if (!limits) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -806,8 +792,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { planId, billingInterval } = result.data;
-      const user = await storage.getUserByEmail(req.user!.email);
+      const userId = req.user!.claims.sub;
+      const userEmail = req.user!.claims.email;
       
+      const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -824,13 +812,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let customerId = user.stripeCustomerId;
       if (!customerId) {
         const customer = await stripe.customers.create({
-          email: user.email,
+          email: userEmail,
           metadata: {
             userId: user.id,
           },
         });
         customerId = customer.id;
-        await storage.updateUserStripeInfo(user.email, customerId);
+        await storage.updateUserStripeInfo(userId, customerId);
       }
 
       // Create Checkout Session
