@@ -3,6 +3,14 @@
 ## Overview
 PocketTrack is a modern web application designed to help users efficiently track and manage their recurring subscriptions. It provides tools for monitoring spending, visualizing costs by category, and staying informed about upcoming renewals. The project aims to offer a comprehensive solution for personal finance management focused on subscription services.
 
+## Recent Changes (October 26, 2025)
+- **Authentication Migration Complete**: Successfully migrated from JWT-based authentication to Replit Auth (OpenID Connect) with Passport.js sessions
+- **User Identification**: All protected routes now use `req.user.claims.sub` (userId) instead of email for user identification
+- **Storage Layer Updated**: `updateUserPlan` and `updateUserStripeInfo` now accept userId instead of email
+- **New Storage Method**: Added `getUserByStripeCustomerId` for Stripe webhook integration
+- **Multi-Tenant Security**: All routes enforce data isolation by filtering on authenticated user's ID
+- **Testing**: E2E tests confirm full CRUD functionality for subscriptions with Replit Auth
+
 ## User Preferences
 - Clean, modern SaaS dashboard aesthetic
 - Linear + Notion inspired design
