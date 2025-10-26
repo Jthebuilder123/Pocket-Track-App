@@ -1,6 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import rateLimit from "express-rate-limit";
+import multer from "multer";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import { storage } from "./storage";
 import { insertSubscriptionSchema, cancelSubscriptionSchema, insertEmailSignupSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
@@ -304,6 +307,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       logger.error("Error fetching subscription history", { error, subscriptionId: req.params.id });
       res.status(500).json({ error: "Failed to fetch subscription history" });
+    }
+  });
+
+  // ===== CSV/Excel Import Routes =====
+
+  // Configure multer for file uploads (in-memory storage)
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: (_req, file, cb) => {
+      const allowedMimeTypes = [
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ];
+      if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only CSV and Excel files are allowed.'));
+      }
+    },
+  });
+
+  // POST /api/subscriptions/import/upload - Parse and preview CSV/Excel
+  app.post("/api/subscriptions/import/upload", upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const fileBuffer = req.file.buffer;
+      const fileType = req.file.mimetype;
+      let rows: any[] = [];
+
+      // Parse CSV
+      if (fileType === 'text/csv') {
+        const csvText = fileBuffer.toString('utf-8');
+        const parsed = Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (header) => header.trim().toLowerCase(),
+        });
+        rows = parsed.data;
+      }
+      // Parse Excel
+      else if (
+        fileType === 'application/vnd.ms-excel' ||
+        fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ) {
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+        // Normalize headers to lowercase
+        rows = jsonData.map((row: any) => {
+          const normalizedRow: any = {};
+          for (const key in row) {
+            normalizedRow[key.trim().toLowerCase()] = row[key];
+          }
+          return normalizedRow;
+        });
+      }
+
+      if (rows.length === 0) {
+        return res.status(400).json({ error: "File contains no valid data" });
+      }
+
+      // Validate and transform rows
+      const validRows: any[] = [];
+      const errors: Array<{ row: number; errors: string[] }> = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNumber = i + 1;
+
+        // Map CSV headers to schema fields (case-insensitive)
+        const mappedRow = {
+          name: row.name || row.service || row.subscription,
+          cost: row.cost || row.price || row.amount,
+          billingCycle: row.billingcycle || row.billing_cycle || row.cycle || row.frequency,
+          category: row.category || row.type,
+          nextRenewalDate: row.nextrenewaldate || row.next_renewal_date || row.renewal_date || row.renewaldate || row.renewal,
+          notes: row.notes || row.description || '',
+        };
+
+        // Validate against schema
+        const result = insertSubscriptionSchema.safeParse(mappedRow);
+        
+        if (result.success) {
+          validRows.push({
+            rowNumber,
+            data: result.data,
+          });
+        } else {
+          const rowErrors = result.error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
+          errors.push({
+            row: rowNumber,
+            errors: rowErrors,
+          });
+        }
+      }
+
+      res.json({
+        totalRows: rows.length,
+        validRows: validRows.length,
+        invalidRows: errors.length,
+        preview: validRows,
+        errors: errors,
+      });
+    } catch (error) {
+      logger.error("Error parsing import file", { error });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to parse file" });
+    }
+  });
+
+  // POST /api/subscriptions/import/confirm - Bulk insert validated subscriptions
+  app.post("/api/subscriptions/import/confirm", async (req, res) => {
+    try {
+      const schema = z.object({
+        subscriptions: z.array(insertSubscriptionSchema),
+      });
+
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromZodError(result.error).toString() });
+      }
+
+      const { subscriptions: subscriptionsToImport } = result.data;
+
+      if (subscriptionsToImport.length === 0) {
+        return res.status(400).json({ error: "No subscriptions to import" });
+      }
+
+      // Insert all subscriptions
+      const createdSubscriptions = [];
+      for (const subData of subscriptionsToImport) {
+        const created = await storage.createSubscription(subData);
+        createdSubscriptions.push(created);
+      }
+
+      res.status(201).json({
+        success: true,
+        imported: createdSubscriptions.length,
+        subscriptions: createdSubscriptions,
+      });
+    } catch (error) {
+      logger.error("Error importing subscriptions", { error });
+      res.status(500).json({ error: "Failed to import subscriptions" });
     }
   });
 

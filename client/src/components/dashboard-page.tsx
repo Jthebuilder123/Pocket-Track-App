@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText, LogOut, LogIn, User } from "lucide-react";
+import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText, LogOut, LogIn, User, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SubscriptionCard } from "@/components/subscription-card";
 import { SubscriptionModal } from "@/components/subscription-modal";
+import { ImportSubscriptions } from "@/components/import-subscriptions";
 import { SpendingCharts } from "@/components/spending-charts";
 import { UpcomingRenewals } from "@/components/upcoming-renewals";
 import { BankConnect } from "@/components/bank-connect";
@@ -20,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -238,6 +240,10 @@ export function DashboardPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button variant="outline" onClick={() => setIsImportOpen(true)} data-testid="button-import">
+              <Upload className="w-4 h-4 mr-2" />
+              Import
+            </Button>
             <Button onClick={handleAddNew} data-testid="button-add-subscription">
               <Plus className="w-4 h-4 mr-2" />
               Add Subscription
@@ -498,6 +504,12 @@ export function DashboardPage() {
         open={isModalOpen}
         onClose={handleCloseModal}
         subscription={editingSubscription}
+      />
+
+      {/* Import Modal */}
+      <ImportSubscriptions
+        open={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
       />
     </div>
   );
