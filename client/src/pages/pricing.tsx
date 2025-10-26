@@ -55,7 +55,8 @@ export default function Pricing() {
     queryKey: ["/api/pricing"],
   });
 
-  const { data: currentPlan } = useQuery({
+  // FIX: Add type to currentPlan query to resolve TypeScript error
+  const { data: currentPlan } = useQuery<UserPlanLimits>({
     queryKey: ["/api/user/plan"],
   });
 
