@@ -477,8 +477,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user!.claims.sub;
       const linkToken = await createLinkToken(userId);
       res.json({ link_token: linkToken });
-    } catch (error) {
+    } catch (error: any) {
       logger.error("Error creating link token", { error });
+      // FIX: Provide clear error message when Plaid credentials are missing
+      if (error.message && error.message.includes('Plaid is not configured')) {
+        return res.status(503).json({ 
+          error: "Bank connections are not configured. Please add PLAID_CLIENT_ID and PLAID_SECRET to your deployment environment variables." 
+        });
+      }
       res.status(500).json({ error: "Failed to create link token" });
     }
   });

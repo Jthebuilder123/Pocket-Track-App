@@ -1,15 +1,19 @@
 import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from 'plaid';
+import logger from './logger';
 
-if (!process.env.PLAID_CLIENT_ID || !process.env.PLAID_SECRET) {
-  throw new Error('PLAID_CLIENT_ID and PLAID_SECRET must be set');
+// FIX: Don't crash server if Plaid credentials are missing - instead provide clear error messages
+const PLAID_CONFIGURED = !!(process.env.PLAID_CLIENT_ID && process.env.PLAID_SECRET);
+
+if (!PLAID_CONFIGURED) {
+  logger.warn('Plaid is not configured. Set PLAID_CLIENT_ID and PLAID_SECRET environment variables to enable bank connections.');
 }
 
 const configuration = new Configuration({
   basePath: PlaidEnvironments.sandbox,
   baseOptions: {
     headers: {
-      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
-      'PLAID-SECRET': process.env.PLAID_SECRET,
+      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID || '',
+      'PLAID-SECRET': process.env.PLAID_SECRET || '',
       'Plaid-Version': '2020-09-14',
     },
   },
@@ -17,7 +21,16 @@ const configuration = new Configuration({
 
 export const plaidClient = new PlaidApi(configuration);
 
+// Helper to check if Plaid is configured
+function ensurePlaidConfigured() {
+  if (!PLAID_CONFIGURED) {
+    throw new Error('Plaid is not configured. Please set PLAID_CLIENT_ID and PLAID_SECRET environment variables in your deployment settings.');
+  }
+}
+
 export const createLinkToken = async (userId: string) => {
+  ensurePlaidConfigured();
+  
   const response = await plaidClient.linkTokenCreate({
     user: {
       client_user_id: userId,
@@ -32,6 +45,8 @@ export const createLinkToken = async (userId: string) => {
 };
 
 export const exchangePublicToken = async (publicToken: string) => {
+  ensurePlaidConfigured();
+  
   const response = await plaidClient.itemPublicTokenExchange({
     public_token: publicToken,
   });
@@ -43,6 +58,8 @@ export const exchangePublicToken = async (publicToken: string) => {
 };
 
 export const getTransactions = async (accessToken: string, startDate: string, endDate: string) => {
+  ensurePlaidConfigured();
+  
   const response = await plaidClient.transactionsGet({
     access_token: accessToken,
     start_date: startDate,
@@ -53,6 +70,8 @@ export const getTransactions = async (accessToken: string, startDate: string, en
 };
 
 export const getAccounts = async (accessToken: string) => {
+  ensurePlaidConfigured();
+  
   const response = await plaidClient.accountsGet({
     access_token: accessToken,
   });
@@ -61,6 +80,8 @@ export const getAccounts = async (accessToken: string) => {
 };
 
 export const getInstitution = async (institutionId: string) => {
+  ensurePlaidConfigured();
+  
   const response = await plaidClient.institutionsGetById({
     institution_id: institutionId,
     country_codes: [CountryCode.Us],
