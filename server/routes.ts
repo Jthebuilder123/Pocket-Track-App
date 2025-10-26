@@ -231,11 +231,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single subscription
-  app.get("/api/subscriptions/:id", async (req, res) => {
+  app.get("/api/subscriptions/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
       const subscription = await storage.getSubscription(req.params.id);
       if (!subscription) {
         return res.status(404).json({ error: "Subscription not found" });
+      }
+      if (subscription.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
       }
       res.json(subscription);
     } catch (error) {
@@ -267,9 +275,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update subscription
-  app.put("/api/subscriptions/:id", async (req, res) => {
+  app.put("/api/subscriptions/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const result = insertSubscriptionSchema.safeParse(req.body);
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Verify ownership
+      const existing = await storage.getSubscription(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      if (existing.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const result = insertSubscriptionSchema.safeParse({ ...req.body, userId: user.id });
       if (!result.success) {
         const errorMessage = fromZodError(result.error).toString();
         return res.status(400).json({ error: errorMessage });
@@ -287,8 +309,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete subscription
-  app.delete("/api/subscriptions/:id", async (req, res) => {
+  app.delete("/api/subscriptions/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Verify ownership
+      const existing = await storage.getSubscription(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      if (existing.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       const deleted = await storage.deleteSubscription(req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Subscription not found" });
@@ -301,8 +337,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cancel subscription
-  app.post("/api/subscriptions/:id/cancel", async (req, res) => {
+  app.post("/api/subscriptions/:id/cancel", requireAuth, async (req: AuthRequest, res) => {
     try {
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Verify ownership
+      const existing = await storage.getSubscription(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      if (existing.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       const result = cancelSubscriptionSchema.safeParse(req.body);
       if (!result.success) {
         const errorMessage = fromZodError(result.error).toString();
@@ -321,8 +371,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get subscription history
-  app.get("/api/subscriptions/:id/history", async (req, res) => {
+  app.get("/api/subscriptions/:id/history", requireAuth, async (req: AuthRequest, res) => {
     try {
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Verify ownership
+      const subscription = await storage.getSubscription(req.params.id);
+      if (!subscription) {
+        return res.status(404).json({ error: "Subscription not found" });
+      }
+      if (subscription.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       const history = await storage.getSubscriptionHistory(req.params.id);
       res.json(history);
     } catch (error) {
@@ -561,11 +625,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sync transactions and detect subscriptions
-  app.post("/api/bank-connections/:id/sync", async (req, res) => {
+  app.post("/api/bank-connections/:id/sync", requireAuth, async (req: AuthRequest, res) => {
     try {
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
       const connection = await storage.getBankConnection(req.params.id);
       if (!connection) {
         return res.status(404).json({ error: "Bank connection not found" });
+      }
+      if (connection.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
       }
 
       const endDate = new Date();
@@ -654,8 +726,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete bank connection
-  app.delete("/api/bank-connections/:id", async (req, res) => {
+  app.delete("/api/bank-connections/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Verify ownership
+      const existing = await storage.getBankConnection(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Bank connection not found" });
+      }
+      if (existing.userId !== user.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       const deleted = await storage.deleteBankConnection(req.params.id);
       if (!deleted) {
         return res.status(404).json({ error: "Bank connection not found" });
