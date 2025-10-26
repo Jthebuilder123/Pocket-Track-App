@@ -235,6 +235,58 @@
  * Even without handling focused or not, this is six possible combinations that
  * need to be distinguished from eachother visually.
  */
+/* FIX: Preventative clickability patches for common CSS/JS issues */
+@layer base {
+  /* FIX: Ensure buttons are always clickable by default */
+  button, [role="button"], input[type="submit"], input[type="button"] {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* FIX: Prevent disabled buttons from being clickable */
+  button:disabled, [aria-disabled="true"] {
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* FIX: Ensure modals/dialogs don't accidentally block underlying content */
+  [role="dialog"]:not([data-state="open"]),
+  [role="alertdialog"]:not([data-state="open"]) {
+    pointer-events: none !important;
+  }
+
+  [role="dialog"][data-state="open"],
+  [role="alertdialog"][data-state="open"] {
+    pointer-events: auto !important;
+  }
+
+  /* FIX: Prevent nested buttons from creating clickability conflicts */
+  button button,
+  a button,
+  button a {
+    pointer-events: none;
+  }
+
+  /* FIX: Ensure overlay backdrops allow clicks to close but don't interfere otherwise */
+  [data-radix-dialog-overlay],
+  [data-radix-alert-dialog-overlay] {
+    cursor: pointer;
+  }
+
+  /* FIX: Ensure focus rings don't interfere with clickability */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* FIX: Prevent transforms from creating click detection issues */
+  button, [role="button"] {
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+  }
+}
+
 @layer utilities {
 
   /* Hide ugly search cancel button in Chrome until we can style it properly */

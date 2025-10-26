@@ -6,7 +6,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { DashboardPage } from "@/components/dashboard-page";
 import Login from "@/pages/login";
 import Pricing from "@/pages/pricing";
+import ClickTest from "@/pages/click-test";
 import NotFound from "@/pages/not-found";
+/* FIX: Import click debugger for diagnosing button clickability issues */
+import "@/lib/click-debugger";
 
 function Router() {
   return (
@@ -14,6 +17,8 @@ function Router() {
       <Route path="/" component={DashboardPage} />
       <Route path="/login" component={Login} />
       <Route path="/pricing" component={Pricing} />
+      {/* FIX: Smoke test page for verifying button clickability */}
+      <Route path="/click-test" component={ClickTest} />
       <Route component={NotFound} />
     </Switch>
   );
