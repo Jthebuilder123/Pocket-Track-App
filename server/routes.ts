@@ -163,12 +163,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all subscriptions
   app.get("/api/subscriptions", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
-
-      const subscriptions = await storage.getSubscriptionsByUserId(user.id);
+      const userId = req.user!.claims.sub;
+      const subscriptions = await storage.getSubscriptionsByUserId(userId);
       res.json(subscriptions);
     } catch (error) {
       logger.error("Error fetching subscriptions", { error });
@@ -179,16 +175,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get single subscription
   app.get("/api/subscriptions/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
-
+      const userId = req.user!.claims.sub;
       const subscription = await storage.getSubscription(req.params.id);
       if (!subscription) {
         return res.status(404).json({ error: "Subscription not found" });
       }
-      if (subscription.userId !== user.id) {
+      if (subscription.userId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(subscription);
@@ -201,12 +193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new subscription
   app.post("/api/subscriptions", requireAuth, checkSubscriptionLimit, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
-
-      const result = insertSubscriptionSchema.safeParse({ ...req.body, userId: user.id });
+      const userId = req.user!.claims.sub;
+      const result = insertSubscriptionSchema.safeParse({ ...req.body, userId });
       if (!result.success) {
         const errorMessage = fromZodError(result.error).toString();
         return res.status(400).json({ error: errorMessage });
@@ -223,21 +211,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update subscription
   app.put("/api/subscriptions/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const userId = req.user!.claims.sub;
 
       // Verify ownership
       const existing = await storage.getSubscription(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Subscription not found" });
       }
-      if (existing.userId !== user.id) {
+      if (existing.userId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      const result = insertSubscriptionSchema.safeParse({ ...req.body, userId: user.id });
+      const result = insertSubscriptionSchema.safeParse({ ...req.body, userId });
       if (!result.success) {
         const errorMessage = fromZodError(result.error).toString();
         return res.status(400).json({ error: errorMessage });
@@ -257,17 +242,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete subscription
   app.delete("/api/subscriptions/:id", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const userId = req.user!.claims.sub;
 
       // Verify ownership
       const existing = await storage.getSubscription(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Subscription not found" });
       }
-      if (existing.userId !== user.id) {
+      if (existing.userId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -285,17 +267,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cancel subscription
   app.post("/api/subscriptions/:id/cancel", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const userId = req.user!.claims.sub;
 
       // Verify ownership
       const existing = await storage.getSubscription(req.params.id);
       if (!existing) {
         return res.status(404).json({ error: "Subscription not found" });
       }
-      if (existing.userId !== user.id) {
+      if (existing.userId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -319,17 +298,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get subscription history
   app.get("/api/subscriptions/:id/history", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByEmail(req.user!.email);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
+      const userId = req.user!.claims.sub;
 
       // Verify ownership
       const subscription = await storage.getSubscription(req.params.id);
       if (!subscription) {
         return res.status(404).json({ error: "Subscription not found" });
       }
-      if (subscription.userId !== user.id) {
+      if (subscription.userId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
 

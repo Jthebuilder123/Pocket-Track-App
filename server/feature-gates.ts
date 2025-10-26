@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import type { AuthRequest } from "./auth";
+import type { AuthRequest } from "./authMiddleware";
 import { storage } from "./storage";
 import { hasFeature, isLimitReached, getLimit, type PricingTier } from "@shared/pricing";
 import logger from "./logger";
@@ -11,12 +11,13 @@ export interface FeatureGateRequest extends AuthRequest {
 // Middleware to check if user has access to a specific feature
 export function requireFeature(featureName: string) {
   return async (req: FeatureGateRequest, res: Response, next: NextFunction) => {
-    if (!req.user) {
+    if (!req.user?.claims?.sub) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
     try {
-      const user = await storage.getUserByEmail(req.user.email);
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
       if (!user) {
         return res.status(401).json({ error: "User not found" });
       }
@@ -27,6 +28,7 @@ export function requireFeature(featureName: string) {
       const featureKey = featureName as keyof import("@shared/pricing").PlanFeatures;
       if (!hasFeature(user.plan as PricingTier, featureKey)) {
         logger.warn("Feature gate blocked access", {
+          userId: user.id,
           email: user.email,
           plan: user.plan,
           feature: featureName,
@@ -54,12 +56,13 @@ export async function checkSubscriptionLimit(
   res: Response,
   next: NextFunction
 ) {
-  if (!req.user) {
+  if (!req.user?.claims?.sub) {
     return res.status(401).json({ error: "Authentication required" });
   }
 
   try {
-    const user = await storage.getUserByEmail(req.user.email);
+    const userId = req.user.claims.sub;
+    const user = await storage.getUser(userId);
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
@@ -72,6 +75,7 @@ export async function checkSubscriptionLimit(
       const limit = getLimit(userPlan, "maxSubscriptions");
       
       logger.warn("Subscription limit reached", {
+        userId: user.id,
         email: user.email,
         plan: userPlan,
         currentCount: activeCount,
@@ -101,12 +105,13 @@ export async function checkBankConnectionLimit(
   res: Response,
   next: NextFunction
 ) {
-  if (!req.user) {
+  if (!req.user?.claims?.sub) {
     return res.status(401).json({ error: "Authentication required" });
   }
 
   try {
-    const user = await storage.getUserByEmail(req.user.email);
+    const userId = req.user.claims.sub;
+    const user = await storage.getUser(userId);
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
@@ -118,6 +123,7 @@ export async function checkBankConnectionLimit(
       const limit = getLimit(userPlan, "maxBankConnections");
       
       logger.warn("Bank connection limit reached", {
+        userId: user.id,
         email: user.email,
         plan: userPlan,
         currentCount: userConnections.length,
@@ -144,8 +150,8 @@ export async function checkBankConnectionLimit(
 }
 
 // Helper function to get user's current plan limits (for client-side display)
-export async function getUserPlanLimits(email: string) {
-  const user = await storage.getUserByEmail(email);
+export async function getUserPlanLimits(userId: string) {
+  const user = await storage.getUser(userId);
   if (!user) {
     return null;
   }
