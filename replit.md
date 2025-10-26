@@ -18,7 +18,7 @@ The application features a responsive design built with React and Shadcn UI, sty
 - **Frontend**: React 18 with TypeScript, Wouter for routing, TanStack Query for state management, and React Hook Form with Zod for form handling.
 - **Backend**: Express.js with TypeScript, providing a robust API for all functionalities.
 - **Database**: PostgreSQL with Drizzle ORM for persistent data storage with full multi-tenant data isolation.
-- **Authentication**: Passwordless magic-link login via email, secured with JWT tokens.
+- **Authentication**: Replit Auth (OpenID Connect) supporting Google OAuth, GitHub, X (Twitter), Apple, and email/password login via Passport.js with session management.
 - **Plaid Integration**: Secure bank connectivity via the Plaid API for automatic subscription detection from transaction history.
 - **Stripe Integration**: Complete payment processing with Checkout sessions and webhook handling for plan upgrades.
 - **Key Features**:
