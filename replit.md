@@ -34,3 +34,6 @@ The system is built with a clear separation of concerns between client and serve
 - **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection.
 - **PostgreSQL**: Relational database for all application data storage.
 - **SendGrid**: (Configurable) for email delivery of magic links and notifications.
+
+## Integration Notes
+- **Google Calendar**: Integration available via Replit connector (connector:ccfg_google-calendar_DDDBAC03DE404369B74F32E78D) but not currently set up. Can be configured in the future to sync subscription renewal dates to calendar events.
