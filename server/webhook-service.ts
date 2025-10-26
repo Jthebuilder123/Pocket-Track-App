@@ -49,7 +49,7 @@ export async function triggerWebhooks(event: string, data: any, webhooks: Webhoo
             webhookId: webhook.id,
             event,
           });
-          await storage.updateWebhookLastTriggered(webhook.id);
+          // Note: lastTriggeredAt tracking can be added in future enhancement
         }
       } catch (error) {
         logger.error(`Error triggering webhook ${webhook.id}`, {
