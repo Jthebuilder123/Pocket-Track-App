@@ -34,8 +34,9 @@ export interface IStorage {
   deleteDetectedSubscription(id: string): Promise<boolean>;
   
   // User operations
+  getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  upsertUser(email: string, name?: string): Promise<User>;
+  upsertUser(userData: { id: string; email?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User>;
   updateUserPlan(email: string, plan: string): Promise<User | undefined>;
   updateUserStripeInfo(email: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User | undefined>;
   
@@ -364,25 +365,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   // User operations
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
   async getUserByEmail(email: string): Promise<User | undefined> {
+    if (!email) return undefined;
     const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
     return user || undefined;
   }
 
-  async upsertUser(email: string, name?: string): Promise<User> {
-    const normalizedEmail = email.toLowerCase();
+  async upsertUser(userData: { id: string; email?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User> {
     const [user] = await db
       .insert(users)
       .values({
-        email: normalizedEmail,
-        name: name || null,
+        id: userData.id,
+        email: userData.email?.toLowerCase() || null,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        profileImageUrl: userData.profileImageUrl || null,
         plan: "free",
       })
       .onConflictDoUpdate({
-        target: users.email,
+        target: users.id,
         set: {
+          email: userData.email?.toLowerCase() || null,
+          firstName: userData.firstName || null,
+          lastName: userData.lastName || null,
+          profileImageUrl: userData.profileImageUrl || null,
           updatedAt: drizzleSql`now()`,
-          ...(name && { name }),
         },
       })
       .returning();
