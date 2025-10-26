@@ -105,7 +105,7 @@ The application implements a three-tier pricing model with strict feature enforc
 
 ### Pro Tier ($7.99/month or $59/year)
 - Unlimited subscriptions
-- Unlimited bank connections (up to 5)
+- Unlimited bank connections
 - Advanced analytics
 - Cancellation helper
 - CSV/JSON export and import
