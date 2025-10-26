@@ -215,9 +215,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all subscriptions
-  app.get("/api/subscriptions", async (_req, res) => {
+  app.get("/api/subscriptions", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const subscriptions = await storage.getAllSubscriptions();
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const subscriptions = await storage.getSubscriptionsByUserId(user.id);
       res.json(subscriptions);
     } catch (error) {
       logger.error("Error fetching subscriptions", { error });
@@ -240,9 +245,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new subscription
-  app.post("/api/subscriptions", requireAuth, checkSubscriptionLimit, async (req, res) => {
+  app.post("/api/subscriptions", requireAuth, checkSubscriptionLimit, async (req: AuthRequest, res) => {
     try {
-      const result = insertSubscriptionSchema.safeParse(req.body);
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const result = insertSubscriptionSchema.safeParse({ ...req.body, userId: user.id });
       if (!result.success) {
         const errorMessage = fromZodError(result.error).toString();
         return res.status(400).json({ error: errorMessage });
@@ -436,8 +446,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/subscriptions/import/confirm - Bulk insert validated subscriptions
-  app.post("/api/subscriptions/import/confirm", requireAuth, requireFeature("importData"), async (req, res) => {
+  app.post("/api/subscriptions/import/confirm", requireAuth, requireFeature("importData"), async (req: AuthRequest, res) => {
     try {
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
       const schema = z.object({
         subscriptions: z.array(insertSubscriptionSchema),
       });
@@ -453,10 +468,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No subscriptions to import" });
       }
 
-      // Insert all subscriptions
+      // Insert all subscriptions with userId
       const createdSubscriptions = [];
       for (const subData of subscriptionsToImport) {
-        const created = await storage.createSubscription(subData);
+        const created = await storage.createSubscription({ ...subData, userId: user.id });
         createdSubscriptions.push(created);
       }
 
@@ -486,8 +501,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Exchange public token for access token and save bank connection
-  app.post("/api/plaid/exchange-token", requireAuth, checkBankConnectionLimit, async (req, res) => {
+  app.post("/api/plaid/exchange-token", requireAuth, checkBankConnectionLimit, async (req: AuthRequest, res) => {
     try {
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
       const schema = z.object({
         public_token: z.string(),
         institution_id: z.string(),
@@ -508,6 +528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { accessToken, itemId } = await exchangePublicToken(public_token);
       
       const connection = await storage.createBankConnection({
+        userId: user.id,
         institutionId: institution_id,
         institutionName: institution_name,
         accessToken,
@@ -524,9 +545,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all bank connections
-  app.get("/api/bank-connections", async (_req, res) => {
+  app.get("/api/bank-connections", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const connections = await storage.getAllBankConnections();
+      const user = await storage.getUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const connections = await storage.getBankConnectionsByUserId(user.id);
       res.json(connections);
     } catch (error) {
       logger.error("Error fetching bank connections", { error });
@@ -735,33 +761,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       logger.error("Error updating notification preferences", { error });
       res.status(500).json({ error: "Failed to update notification preferences" });
     }
-  });
-
-  // 404 handler for API routes
-  app.use("/api/*", (_req, res) => {
-    res.status(404).json({ 
-      error: "Not Found",
-      message: "The requested API endpoint does not exist"
-    });
-  });
-
-  // Global error handler
-  app.use((err: any, req: any, res: any, next: any) => {
-    logger.error("Unhandled error", { 
-      error: err,
-      path: req.path,
-      method: req.method,
-      stack: err.stack
-    });
-
-    // Don't expose internal error details in production
-    const isDevelopment = process.env.NODE_ENV !== "production";
-    const statusCode = err.statusCode || err.status || 500;
-
-    res.status(statusCode).json({
-      error: err.message || "Internal Server Error",
-      ...(isDevelopment && { stack: err.stack, details: err })
-    });
   });
 
   // ===== Stripe Checkout & Billing Routes =====
@@ -979,6 +978,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+
+  // 404 handler for API routes
+  app.use("/api/*", (_req, res) => {
+    res.status(404).json({ 
+      error: "Not Found",
+      message: "The requested API endpoint does not exist"
+    });
+  });
+
+  // Global error handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    logger.error("Unhandled error", { 
+      error: err,
+      path: req.path,
+      method: req.method,
+      stack: err.stack
+    });
+
+    // Don't expose internal error details in production
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    const statusCode = err.statusCode || err.status || 500;
+
+    res.status(statusCode).json({
+      error: err.message || "Internal Server Error",
+      ...(isDevelopment && { stack: err.stack, details: err })
+    });
+  });
 
   const httpServer = createServer(app);
   return httpServer;

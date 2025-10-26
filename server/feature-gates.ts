@@ -65,8 +65,8 @@ export async function checkSubscriptionLimit(
     }
 
     const userPlan = user.plan as PricingTier;
-    const currentSubscriptions = await storage.getAllSubscriptions();
-    const activeCount = currentSubscriptions.filter((s) => s.status === "active").length;
+    const userSubscriptions = await storage.getSubscriptionsByUserId(user.id);
+    const activeCount = userSubscriptions.filter((s) => s.status === "active").length;
 
     if (isLimitReached(userPlan, "maxSubscriptions", activeCount)) {
       const limit = getLimit(userPlan, "maxSubscriptions");
@@ -112,15 +112,15 @@ export async function checkBankConnectionLimit(
     }
 
     const userPlan = user.plan as PricingTier;
-    const currentConnections = await storage.getAllBankConnections();
+    const userConnections = await storage.getBankConnectionsByUserId(user.id);
 
-    if (isLimitReached(userPlan, "maxBankConnections", currentConnections.length)) {
+    if (isLimitReached(userPlan, "maxBankConnections", userConnections.length)) {
       const limit = getLimit(userPlan, "maxBankConnections");
       
       logger.warn("Bank connection limit reached", {
         email: user.email,
         plan: userPlan,
-        currentCount: currentConnections.length,
+        currentCount: userConnections.length,
         limit,
       });
 
@@ -130,7 +130,7 @@ export async function checkBankConnectionLimit(
           ? `Bank connections are not available on the ${userPlan} plan. Please upgrade to connect your bank accounts.`
           : `You've reached the maximum of ${limit} bank connection(s) on your ${userPlan} plan. Please upgrade to connect more accounts.`,
         currentPlan: userPlan,
-        currentCount: currentConnections.length,
+        currentCount: userConnections.length,
         limit,
       });
     }
@@ -151,10 +151,10 @@ export async function getUserPlanLimits(email: string) {
   }
 
   const plan = user.plan as PricingTier;
-  const subscriptions = await storage.getAllSubscriptions();
-  const bankConnections = await storage.getAllBankConnections();
+  const userSubscriptions = await storage.getSubscriptionsByUserId(user.id);
+  const userBankConnections = await storage.getBankConnectionsByUserId(user.id);
   
-  const activeSubscriptions = subscriptions.filter((s) => s.status === "active").length;
+  const activeSubscriptions = userSubscriptions.filter((s) => s.status === "active").length;
   const maxSubscriptions = getLimit(plan, "maxSubscriptions");
   const maxBankConnections = getLimit(plan, "maxBankConnections");
 
@@ -166,9 +166,9 @@ export async function getUserPlanLimits(email: string) {
       canAdd: maxSubscriptions === null || activeSubscriptions < maxSubscriptions,
     },
     bankConnections: {
-      current: bankConnections.length,
+      current: userBankConnections.length,
       max: maxBankConnections,
-      canAdd: maxBankConnections === null || bankConnections.length < maxBankConnections,
+      canAdd: maxBankConnections === null || userBankConnections.length < maxBankConnections,
     },
     features: {
       exportData: hasFeature(plan, "exportData"),

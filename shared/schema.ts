@@ -5,6 +5,7 @@ import { z } from "zod";
 
 export const subscriptions = pgTable("subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
   cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
   billingCycle: text("billing_cycle").notNull(),
@@ -35,6 +36,7 @@ export const subscriptionHistory = pgTable("subscription_history", {
 });
 
 export const insertSubscriptionSchema = createInsertSchema(subscriptions, {
+  userId: z.string(),
   cost: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
     message: "Cost must be a positive number",
   }),
@@ -96,6 +98,7 @@ export const cancelSubscriptionSchema = z.object({
 // Bank connections table
 export const bankConnections = pgTable("bank_connections", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
   institutionId: text("institution_id").notNull(),
   institutionName: text("institution_name").notNull(),
   accessToken: text("access_token").notNull(),

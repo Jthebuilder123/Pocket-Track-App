@@ -7,6 +7,7 @@ import { triggerWebhooks } from "./webhook-service";
 export interface IStorage {
   // Subscription operations
   getAllSubscriptions(): Promise<Subscription[]>;
+  getSubscriptionsByUserId(userId: string): Promise<Subscription[]>;
   getSubscription(id: string): Promise<Subscription | undefined>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
   updateSubscription(id: string, subscription: InsertSubscription): Promise<Subscription | undefined>;
@@ -19,6 +20,7 @@ export interface IStorage {
   
   // Bank connection operations
   getAllBankConnections(): Promise<BankConnection[]>;
+  getBankConnectionsByUserId(userId: string): Promise<BankConnection[]>;
   getBankConnection(id: string): Promise<BankConnection | undefined>;
   createBankConnection(connection: Omit<BankConnection, "id" | "createdAt">): Promise<BankConnection>;
   deleteBankConnection(id: string): Promise<boolean>;
@@ -57,6 +59,10 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getAllSubscriptions(): Promise<Subscription[]> {
     return await db.select().from(subscriptions);
+  }
+
+  async getSubscriptionsByUserId(userId: string): Promise<Subscription[]> {
+    return await db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
   }
 
   async getSubscription(id: string): Promise<Subscription | undefined> {
@@ -211,6 +217,10 @@ export class DatabaseStorage implements IStorage {
   // Bank connection methods
   async getAllBankConnections(): Promise<BankConnection[]> {
     return await db.select().from(bankConnections);
+  }
+
+  async getBankConnectionsByUserId(userId: string): Promise<BankConnection[]> {
+    return await db.select().from(bankConnections).where(eq(bankConnections.userId, userId));
   }
 
   async getBankConnection(id: string): Promise<BankConnection | undefined> {
