@@ -472,9 +472,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== Plaid Bank Integration Routes =====
 
   // Create Plaid Link token
-  app.post("/api/plaid/create-link-token", async (_req, res) => {
+  app.post("/api/plaid/create-link-token", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const userId = "user-default";
+      const userId = req.user!.claims.sub;
       const linkToken = await createLinkToken(userId);
       res.json({ link_token: linkToken });
     } catch (error) {
@@ -727,9 +727,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== Notification Preferences Routes =====
 
   // Get notification preferences
-  app.get("/api/notification-preferences", async (_req, res) => {
+  app.get("/api/notification-preferences", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const userId = "user-default"; // TODO: Get from auth context
+      const userId = req.user!.claims.sub;
       const prefs = await storage.getNotificationPreferences(userId);
       res.json(prefs || { userId, emailRenewalReminders: "true", reminderDaysBefore: "7", weeklyDigest: "false", cancelConfirmations: "true" });
     } catch (error) {
@@ -739,9 +739,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update notification preferences
-  app.put("/api/notification-preferences", async (req, res) => {
+  app.put("/api/notification-preferences", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const userId = "user-default"; // TODO: Get from auth context
+      const userId = req.user!.claims.sub;
       const { insertNotificationPreferencesSchema } = await import("@shared/schema");
       const result = insertNotificationPreferencesSchema.safeParse({ ...req.body, userId });
       if (!result.success) {
@@ -901,22 +901,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const planId = session.metadata?.planId;
 
             if (userId && planId && session.customer) {
-              // Update user's plan and Stripe info
-              const user = await storage.getUserByEmail(session.customer_email || "");
-              if (user) {
-                await storage.updateUserPlan(user.email, planId);
-                await storage.updateUserStripeInfo(
-                  user.email,
-                  session.customer as string,
-                  session.subscription as string
-                );
-                
-                logger.info("User plan activated", {
-                  email: user.email,
-                  plan: planId,
-                  subscriptionId: session.subscription,
-                });
-              }
+              // Update user's plan and Stripe info using userId from metadata
+              await storage.updateUserPlan(userId, planId);
+              await storage.updateUserStripeInfo(
+                userId,
+                session.customer as string,
+                session.subscription as string
+              );
+              
+              logger.info("User plan activated", {
+                userId,
+                plan: planId,
+                subscriptionId: session.subscription,
+              });
             }
             break;
           }
@@ -926,21 +923,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const customerId = subscription.customer as string;
 
             // Find user by Stripe customer ID
-            const user = await storage.getUserByEmail(""); // Need to add query by customerId
+            const user = await storage.getUserByStripeCustomerId(customerId);
             if (user) {
               // Handle subscription status changes
               if (subscription.status === "active") {
                 // Reactivate plan if it was paused
                 logger.info("Subscription reactivated", {
                   customerId,
+                  userId: user.id,
                   subscriptionId: subscription.id,
                 });
               } else if (subscription.status === "canceled" || subscription.status === "unpaid") {
                 // Downgrade to free plan
-                await storage.updateUserPlan(user.email, PRICING_TIERS.FREE);
+                await storage.updateUserPlan(user.id, PRICING_TIERS.FREE);
                 logger.info("Subscription canceled, downgraded to free", {
                   customerId,
-                  email: user.email,
+                  userId: user.id,
                 });
               }
             }
@@ -952,12 +950,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const customerId = subscription.customer as string;
 
             // Find user and downgrade to free plan
-            const user = await storage.getUserByEmail(""); // Need to add query by customerId
+            const user = await storage.getUserByStripeCustomerId(customerId);
             if (user) {
-              await storage.updateUserPlan(user.email, PRICING_TIERS.FREE);
+              await storage.updateUserPlan(user.id, PRICING_TIERS.FREE);
               logger.info("Subscription deleted, downgraded to free", {
                 customerId,
-                email: user.email,
+                userId: user.id,
               });
             }
             break;

@@ -36,9 +36,10 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | undefined>;
   upsertUser(userData: { id: string; email?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User>;
-  updateUserPlan(email: string, plan: string): Promise<User | undefined>;
-  updateUserStripeInfo(email: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User | undefined>;
+  updateUserPlan(userId: string, plan: string): Promise<User | undefined>;
+  updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User | undefined>;
   
   // Email signup operations
   createEmailSignup(signup: InsertEmailSignup): Promise<EmailSignup>;
@@ -376,6 +377,12 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByStripeCustomerId(stripeCustomerId: string): Promise<User | undefined> {
+    if (!stripeCustomerId) return undefined;
+    const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, stripeCustomerId));
+    return user || undefined;
+  }
+
   async upsertUser(userData: { id: string; email?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User> {
     const [user] = await db
       .insert(users)
@@ -402,18 +409,18 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserPlan(email: string, plan: string): Promise<User | undefined> {
+  async updateUserPlan(userId: string, plan: string): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set({ plan, updatedAt: drizzleSql`now()` })
-      .where(eq(users.email, email.toLowerCase()))
+      .where(eq(users.id, userId))
       .returning();
     
     return user || undefined;
   }
 
   async updateUserStripeInfo(
-    email: string,
+    userId: string,
     stripeCustomerId: string,
     stripeSubscriptionId?: string
   ): Promise<User | undefined> {
@@ -424,7 +431,7 @@ export class DatabaseStorage implements IStorage {
         ...(stripeSubscriptionId && { stripeSubscriptionId }),
         updatedAt: drizzleSql`now()`,
       })
-      .where(eq(users.email, email.toLowerCase()))
+      .where(eq(users.id, userId))
       .returning();
     
     return user || undefined;
