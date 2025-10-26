@@ -37,7 +37,12 @@ function Router() {
           <Route path="/" component={DashboardPage} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/click-test" component={ClickTest} />
-          <Route component={NotFound} />
+          <Route path="/:rest*">
+            {() => {
+              window.location.replace('/');
+              return null;
+            }}
+          </Route>
         </>
       )}
     </Switch>
