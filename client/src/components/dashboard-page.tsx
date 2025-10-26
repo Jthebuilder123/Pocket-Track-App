@@ -40,28 +40,11 @@ export function DashboardPage() {
     retry: false,
   });
 
-  // Logout mutation
+  // FIX: Logout mutation - updated to match backend GET /api/logout endpoint
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Logout failed");
-    },
-    onSuccess: () => {
-      toast({
-        title: "Logged Out",
-        description: "You have been successfully logged out",
-      });
-      setLocation("/login");
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to logout",
-        variant: "destructive",
-      });
+      // FIX: Backend uses GET /api/logout, not POST /api/auth/logout
+      window.location.href = "/api/logout";
     },
   });
 
