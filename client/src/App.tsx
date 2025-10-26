@@ -37,7 +37,8 @@ function Router() {
           <Route path="/" component={DashboardPage} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/click-test" component={ClickTest} />
-          <Route path="/:rest*">
+          {/* FIX: Use proper wouter catch-all syntax - routes without path match everything not matched above */}
+          <Route>
             {() => {
               window.location.replace('/');
               return null;
