@@ -32,6 +32,20 @@ interface Plan {
   popular?: boolean;
 }
 
+// FIX: Add type for user plan limits response from API
+interface UserPlanLimits {
+  plan: string;
+  subscriptions: {
+    current: number;
+    limit: number | null;
+  };
+  bankConnections: {
+    current: number;
+    limit: number | null;
+  };
+  features: PlanFeatures;
+}
+
 export default function Pricing() {
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
   const [, navigate] = useLocation();
