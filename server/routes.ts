@@ -587,8 +587,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Confirm detected subscription (convert to real subscription)
-  app.post("/api/detected-subscriptions/:id/confirm", async (req, res) => {
+  app.post("/api/detected-subscriptions/:id/confirm", requireAuth, async (req: AuthRequest, res) => {
     try {
+      const userId = req.user!.claims.sub;
       const detected = await storage.getDetectedSubscription(req.params.id);
       if (!detected) {
         return res.status(404).json({ error: "Detected subscription not found" });
@@ -604,6 +605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const subscription = await storage.createSubscription({
+        userId,
         name: detected.merchantName,
         cost: detected.estimatedCost.toString(),
         billingCycle: detected.detectedBillingCycle as "Monthly" | "Quarterly" | "Yearly",
