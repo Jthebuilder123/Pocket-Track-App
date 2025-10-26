@@ -17,23 +17,61 @@ The application features a responsive design built with React and Shadcn UI, sty
 ### Technical Implementations
 - **Frontend**: React 18 with TypeScript, Wouter for routing, TanStack Query for state management, and React Hook Form with Zod for form handling.
 - **Backend**: Express.js with TypeScript, providing a robust API for all functionalities.
-- **Database**: PostgreSQL with Drizzle ORM for persistent data storage.
+- **Database**: PostgreSQL with Drizzle ORM for persistent data storage with full multi-tenant data isolation.
 - **Authentication**: Passwordless magic-link login via email, secured with JWT tokens.
 - **Plaid Integration**: Secure bank connectivity via the Plaid API for automatic subscription detection from transaction history.
+- **Stripe Integration**: Complete payment processing with Checkout sessions and webhook handling for plan upgrades.
 - **Key Features**:
-    - Comprehensive subscription lifecycle management (add, edit, delete, cancel).
+    - Comprehensive subscription lifecycle management (add, edit, delete, cancel) with ownership verification.
     - Visual analytics dashboard.
-    - Export and import functionalities (CSV/JSON).
-    - Webhook system for external integrations and notification preferences for renewal reminders.
+    - Export and import functionalities (CSV/JSON) gated by plan tier.
+    - Webhook system for external integrations gated by plan tier.
+    - Email notification preferences for renewal reminders.
     - Audit trail for subscription changes.
+    - Three-tier pricing system (Free, Essentials, Pro) with feature gates enforcing per-user limits.
 
 ### System Design Choices
 The system is built with a clear separation of concerns between client and server. Shared types and schemas are centralized. Authentication includes rate limiting and secure session management. Production readiness features include health monitoring, structured logging, robust error handling, and environment variable validation for security.
 
 ## External Dependencies
 - **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection.
-- **PostgreSQL**: Relational database for all application data storage.
+- **Stripe**: Payment processing for subscription plans with webhook-based plan activation.
+- **PostgreSQL**: Relational database for all application data storage with proper multi-tenant isolation.
 - **SendGrid**: (Configurable) for email delivery of magic links and notifications.
+
+## Pricing & Feature Gates
+The application implements a three-tier pricing model with strict feature enforcement:
+
+### Free Tier ($0/month)
+- 5 active subscriptions maximum
+- 0 bank connections
+- Basic analytics dashboard
+- Cancellation helper
+- No data import/export
+- No email notifications
+- No webhook integrations
+
+### Essentials Tier ($9/month or $84/year)
+- 25 active subscriptions maximum
+- 1 bank connection
+- Full analytics dashboard
+- Cancellation helper
+- CSV/JSON export and import
+- Email notifications
+- No webhook integrations
+- Most popular tier
+
+### Pro Tier ($19/month or $180/year)
+- Unlimited subscriptions
+- Unlimited bank connections (up to 5)
+- Advanced analytics
+- Cancellation helper
+- CSV/JSON export and import
+- Email notifications
+- Webhook integrations
+- Priority support
+
+All feature limits are enforced at the API level via middleware that verifies user plan and current usage. Multi-tenant data isolation ensures users can only access their own subscriptions and bank connections.
 
 ## Integration Notes
 - **Google Calendar**: Integration available via Replit connector (connector:ccfg_google-calendar_DDDBAC03DE404369B74F32E78D) but not currently set up. Can be configured in the future to sync subscription renewal dates to calendar events.
