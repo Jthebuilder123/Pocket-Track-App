@@ -4,12 +4,20 @@ import logger from './logger';
 // FIX: Don't crash server if Plaid credentials are missing - instead provide clear error messages
 const PLAID_CONFIGURED = !!(process.env.PLAID_CLIENT_ID && process.env.PLAID_SECRET);
 
+// FIX: Support both sandbox (testing) and production environments
+const PLAID_ENV = process.env.PLAID_ENV || 'sandbox';
+const plaidEnvironment = PLAID_ENV === 'production' 
+  ? PlaidEnvironments.production 
+  : PlaidEnvironments.sandbox;
+
 if (!PLAID_CONFIGURED) {
   logger.warn('Plaid is not configured. Set PLAID_CLIENT_ID and PLAID_SECRET environment variables to enable bank connections.');
+} else {
+  logger.info(`Plaid configured for ${PLAID_ENV} environment`);
 }
 
 const configuration = new Configuration({
-  basePath: PlaidEnvironments.sandbox,
+  basePath: plaidEnvironment,
   baseOptions: {
     headers: {
       'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID || '',

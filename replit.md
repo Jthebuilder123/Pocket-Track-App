@@ -4,6 +4,9 @@
 PocketTrack is a modern web application designed to help users efficiently track and manage their recurring subscriptions. It provides tools for monitoring spending, visualizing costs by category, and staying informed about upcoming renewals. The project aims to offer a comprehensive solution for personal finance management focused on subscription services.
 
 ## Recent Changes (October 26, 2025)
+- **Page Flickering Fix**: Fixed infinite request loop caused by catch-all route using `window.location.replace()`. Changed to wouter's `Redirect` component for smooth client-side navigation.
+- **Plaid Error Handling**: Improved error handling for missing Plaid credentials. Server no longer crashes when `PLAID_CLIENT_ID` and `PLAID_SECRET` are missing - instead shows clear error message.
+- **Deployment Documentation**: Added comprehensive guide for configuring environment variables in published deployments, especially Plaid credentials.
 - **Authentication Migration Complete**: Successfully migrated from JWT-based authentication to Replit Auth (OpenID Connect) with Passport.js sessions
 - **User Identification**: All protected routes now use `req.user.claims.sub` (userId) instead of email for user identification
 - **Storage Layer Updated**: `updateUserPlan` and `updateUserStripeInfo` now accept userId instead of email
@@ -43,9 +46,34 @@ The system is built with a clear separation of concerns between client and serve
 
 ## External Dependencies
 - **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection.
+  - Requires `PLAID_CLIENT_ID` and `PLAID_SECRET` environment variables
+  - Development uses sandbox environment (test data only)
+  - Production requires Plaid production credentials for real bank connections
 - **Stripe**: Payment processing for subscription plans with webhook-based plan activation.
+  - Requires `STRIPE_SECRET_KEY` environment variable
 - **PostgreSQL**: Relational database for all application data storage with proper multi-tenant isolation.
 - **SendGrid**: (Configurable) for email delivery of magic links and notifications.
+  - Requires `SENDGRID_API_KEY` environment variable (optional)
+
+### Configuring Environment Variables for Published Deployment
+
+When you publish your app, environment variables from development are NOT automatically copied. You must add them manually to your published deployment:
+
+**To add Plaid credentials to your published app:**
+1. Go to your Replit project
+2. Click on the "Deployments" tab
+3. Click on your active deployment
+4. Navigate to "Environment variables" or "Secrets"
+5. Add the following variables:
+   - `PLAID_CLIENT_ID`: Your Plaid client ID
+   - `PLAID_SECRET`: Your Plaid secret key
+   - `PLAID_ENV`: Set to `sandbox` for testing or `production` for real banks (defaults to `sandbox` if not set)
+6. Save and redeploy your application
+
+**Important Notes:**
+- For testing: Use Plaid sandbox credentials (these work with test banks only) and set `PLAID_ENV=sandbox`
+- For production: You need Plaid production credentials (requires Plaid approval for real bank connections) and set `PLAID_ENV=production`
+- The app will run without Plaid credentials but bank connection features will show a configuration error message
 
 ## Pricing & Feature Gates
 The application implements a three-tier pricing model with strict feature enforcement:
