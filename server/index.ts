@@ -82,7 +82,19 @@ app.use((req, res, next) => {
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    // In production, serve static files if build exists
+    // During deployment, health checks may run before build completes
+    try {
+      serveStatic(app);
+      log("Static files configured");
+    } catch (error) {
+      log("Static files not available yet - build may be in progress");
+      // Fallback: The / and /api routes are already registered above
+      // This catch-all only handles unmatched routes
+      app.use("*", (_req, res) => {
+        res.status(503).send("Application is building...");
+      });
+    }
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
