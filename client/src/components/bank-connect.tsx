@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { usePlaidLink } from "react-plaid-link";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, RefreshCw, Unplug, AlertCircle } from "lucide-react";
+import { Building2, RefreshCw, Unplug, AlertCircle, LogIn, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,15 +9,26 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type BankConnection } from "@shared/schema";
+import { useLocation } from "wouter";
 // CAP: Import Capacitor utilities for native browser handling
 import { isCapacitor, openInSystemBrowser, getReturnUrl, handlePlaidReturn } from "@/lib/capacitorUtils";
 
 export function BankConnect() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  // Check authentication status
+  const { data: user } = useQuery<{ email: string } | null>({
+    queryKey: ["/api/auth/me"],
+    retry: false,
+  });
+
+  const isGuest = !user;
 
   const { data: connections = [], isLoading } = useQuery<BankConnection[]>({
     queryKey: ["/api/bank-connections"],
+    enabled: !isGuest, // Only fetch if authenticated
   });
 
   // Create link token mutation
@@ -192,6 +203,68 @@ export function BankConnect() {
     open();
   }
 
+  // Show guest mode UI if not authenticated
+  if (isGuest) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold" data-testid="text-bank-title">Bank Connections</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Automatically detect subscriptions from your bank transactions
+          </p>
+        </div>
+
+        <Card data-testid="card-guest-bank-prompt">
+          <CardHeader>
+            <div className="flex items-start gap-4">
+              <div className="rounded-full bg-primary/10 p-3">
+                <Lock className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <CardTitle className="text-xl">Sign In Required</CardTitle>
+                <CardDescription className="mt-2">
+                  Bank connections require a secure account to protect your financial data. 
+                  When you sign in, you'll be able to:
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <span className="text-primary mt-0.5">✓</span>
+                <span>Connect your bank account securely via Plaid</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary mt-0.5">✓</span>
+                <span>Automatically detect recurring subscriptions from transactions</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary mt-0.5">✓</span>
+                <span>Keep your financial data encrypted and private</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary mt-0.5">✓</span>
+                <span>Sync transactions to stay up-to-date</span>
+              </li>
+            </ul>
+            <div className="pt-2">
+              <Button 
+                onClick={() => setLocation("/login")}
+                className="w-full sm:w-auto"
+                data-testid="button-signin-for-bank"
+              >
+                <LogIn className="w-4 h-4 mr-2" />
+                Sign In to Connect Bank
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Authenticated user UI
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
