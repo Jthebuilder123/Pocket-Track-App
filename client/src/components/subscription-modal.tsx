@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { X } from "lucide-react";
+import { X, ChevronDown, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +50,7 @@ export function SubscriptionModal({ open, onClose, subscription, template }: Sub
   const isEditing = !!subscription;
   const createMutation = useCreateSubscription();
   const updateMutation = useUpdateSubscription();
+  const [showCancellationHelp, setShowCancellationHelp] = useState(false);
 
   const form = useForm<InsertSubscriptionClient>({
     resolver: zodResolver(insertSubscriptionSchemaClient),
@@ -72,7 +73,13 @@ export function SubscriptionModal({ open, onClose, subscription, template }: Sub
         category: subscription.category,
         nextRenewalDate: new Date(subscription.nextRenewalDate),
         notes: subscription.notes || "",
+        cancellationUrl: subscription.cancellationUrl || "",
+        supportEmail: subscription.supportEmail || "",
+        supportPhone: subscription.supportPhone || "",
+        cancellationSteps: subscription.cancellationSteps || "",
       });
+      // Show cancellation help section if any cancellation data exists
+      setShowCancellationHelp(!!(subscription.cancellationUrl || subscription.supportEmail || subscription.supportPhone || subscription.cancellationSteps));
     } else if (template) {
       // Pre-fill form with template data
       form.reset({
@@ -82,7 +89,12 @@ export function SubscriptionModal({ open, onClose, subscription, template }: Sub
         category: template.category,
         nextRenewalDate: new Date(),
         notes: template.description || "",
+        cancellationUrl: "",
+        supportEmail: "",
+        supportPhone: "",
+        cancellationSteps: "",
       });
+      setShowCancellationHelp(false);
     } else {
       form.reset({
         name: "",
@@ -91,7 +103,12 @@ export function SubscriptionModal({ open, onClose, subscription, template }: Sub
         category: "Other",
         nextRenewalDate: new Date(),
         notes: "",
+        cancellationUrl: "",
+        supportEmail: "",
+        supportPhone: "",
+        cancellationSteps: "",
       });
+      setShowCancellationHelp(false);
     }
   }, [subscription, template, open]);
 
@@ -284,6 +301,110 @@ export function SubscriptionModal({ open, onClose, subscription, template }: Sub
                 </FormItem>
               )}
             />
+
+            {/* Cancellation Assistance Section */}
+            <div className="border-t pt-4">
+              <button
+                type="button"
+                onClick={() => setShowCancellationHelp(!showCancellationHelp)}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                data-testid="button-toggle-cancellation"
+              >
+                {showCancellationHelp ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                Cancellation Help (Optional)
+              </button>
+
+              {showCancellationHelp && (
+                <div className="space-y-4 mt-4" data-testid="section-cancellation-help">
+                  <p className="text-sm text-muted-foreground">
+                    Add cancellation information to make it easier to cancel this subscription later.
+                  </p>
+
+                  <FormField
+                    control={form.control}
+                    name="cancellationUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cancellation URL</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="url"
+                            placeholder="https://example.com/cancel"
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-cancellation-url"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="supportEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Support Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              placeholder="support@example.com"
+                              {...field}
+                              value={field.value || ""}
+                              data-testid="input-support-email"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="supportPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Support Phone</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="tel"
+                              placeholder="1-800-555-0100"
+                              {...field}
+                              value={field.value || ""}
+                              data-testid="input-support-phone"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="cancellationSteps"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cancellation Steps</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="1. Log in to account&#10;2. Go to settings&#10;3. Click 'Cancel Subscription'..."
+                            className="resize-none"
+                            rows={4}
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-cancellation-steps"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
 
             <DialogFooter className="gap-2">
               <Button

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, Trash2, Calendar, Ban, History } from "lucide-react";
+import { Pencil, Trash2, Calendar, Ban, History, ExternalLink, Mail, Phone, HelpCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { SubscriptionHistoryDialog } from "./subscription-history-dialog";
 
 interface SubscriptionCardProps {
@@ -31,6 +38,15 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
   const { toast } = useToast();
   const [cancelReason, setCancelReason] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [showCancellationHelp, setShowCancellationHelp] = useState(false);
+
+  // Check if cancellation help info exists
+  const hasCancellationHelp = !!(
+    subscription.cancellationUrl ||
+    subscription.supportEmail ||
+    subscription.supportPhone ||
+    subscription.cancellationSteps
+  );
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -158,6 +174,18 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
                 History
               </Button>
 
+              {hasCancellationHelp && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCancellationHelp(true)}
+                  data-testid={`button-cancel-help-${subscription.id}`}
+                >
+                  <HelpCircle className="w-3.5 h-3.5 mr-1.5" />
+                  Cancellation Help
+                </Button>
+              )}
+
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -242,6 +270,73 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
         subscriptionId={subscription.id}
         subscriptionName={subscription.name}
       />
+
+      {/* Cancellation Help Dialog */}
+      <Dialog open={showCancellationHelp} onOpenChange={setShowCancellationHelp}>
+        <DialogContent className="max-w-md" data-testid="dialog-cancellation-help">
+          <DialogHeader>
+            <DialogTitle>Cancellation Help for {subscription.name}</DialogTitle>
+            <DialogDescription>
+              Use this information to cancel your subscription with the service provider.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {subscription.cancellationUrl && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Cancellation Page</Label>
+                <a
+                  href={subscription.cancellationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  data-testid="link-cancellation-url"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open cancellation page
+                </a>
+              </div>
+            )}
+
+            {subscription.supportEmail && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Support Email</Label>
+                <a
+                  href={`mailto:${subscription.supportEmail}`}
+                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  data-testid="link-support-email"
+                >
+                  <Mail className="w-4 h-4" />
+                  {subscription.supportEmail}
+                </a>
+              </div>
+            )}
+
+            {subscription.supportPhone && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Support Phone</Label>
+                <a
+                  href={`tel:${subscription.supportPhone}`}
+                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  data-testid="link-support-phone"
+                >
+                  <Phone className="w-4 h-4" />
+                  {subscription.supportPhone}
+                </a>
+              </div>
+            )}
+
+            {subscription.cancellationSteps && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Cancellation Steps</Label>
+                <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted p-3 rounded-md" data-testid="text-cancellation-steps">
+                  {subscription.cancellationSteps}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
