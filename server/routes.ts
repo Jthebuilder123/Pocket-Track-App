@@ -1012,6 +1012,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // ===== Subscription Templates Routes (Public - no auth required) =====
+  
+  // GET /api/templates - Get all subscription templates
+  app.get("/api/templates", async (_req, res) => {
+    try {
+      const templates = await storage.getAllTemplates();
+      res.json(templates);
+    } catch (error) {
+      logger.error("Error fetching templates", { error });
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  // GET /api/templates/search - Search templates
+  app.get("/api/templates/search", async (req, res) => {
+    try {
+      const query = req.query.q as string || "";
+      const templates = await storage.searchTemplates(query);
+      res.json(templates);
+    } catch (error) {
+      logger.error("Error searching templates", { error, query: req.query.q });
+      res.status(500).json({ error: "Failed to search templates" });
+    }
+  });
+
+  // GET /api/templates/category/:category - Get templates by category
+  app.get("/api/templates/category/:category", async (req, res) => {
+    try {
+      const templates = await storage.getTemplatesByCategory(req.params.category);
+      res.json(templates);
+    } catch (error) {
+      logger.error("Error fetching templates by category", { error, category: req.params.category });
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  // GET /api/templates/:id - Get single template
+  app.get("/api/templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      logger.error("Error fetching template", { error, templateId: req.params.id });
+      res.status(500).json({ error: "Failed to fetch template" });
+    }
+  });
+
   // 404 handler for API routes
   app.use("/api/*", (_req, res) => {
     res.status(404).json({ 

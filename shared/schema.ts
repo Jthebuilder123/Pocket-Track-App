@@ -237,3 +237,24 @@ export const WEBHOOK_EVENTS = [
   "bank.connected",
   "bank.synced",
 ] as const;
+
+// Subscription templates table
+export const subscriptionTemplates = pgTable("subscription_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  suggestedPrice: decimal("suggested_price", { precision: 10, scale: 2 }).notNull(),
+  billingCycle: text("billing_cycle").notNull(),
+  logoUrl: text("logo_url"),
+  description: text("description"),
+  popularity: text("popularity").notNull().default("0"), // For sorting popular services
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertSubscriptionTemplateSchema = createInsertSchema(subscriptionTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type SubscriptionTemplate = typeof subscriptionTemplates.$inferSelect;
+export type InsertSubscriptionTemplate = z.infer<typeof insertSubscriptionTemplateSchema>;

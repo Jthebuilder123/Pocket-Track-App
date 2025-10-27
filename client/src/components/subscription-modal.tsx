@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import {
   Dialog,
@@ -28,10 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCreateSubscription, useUpdateSubscription } from "@/hooks/useSubscriptions";
 import {
   type Subscription,
+  type SubscriptionTemplate,
   type InsertSubscriptionClient,
   insertSubscriptionSchemaClient,
   SUBSCRIPTION_CATEGORIES,
@@ -42,11 +42,14 @@ interface SubscriptionModalProps {
   open: boolean;
   onClose: () => void;
   subscription?: Subscription;
+  template?: SubscriptionTemplate;
 }
 
-export function SubscriptionModal({ open, onClose, subscription }: SubscriptionModalProps) {
+export function SubscriptionModal({ open, onClose, subscription, template }: SubscriptionModalProps) {
   const { toast } = useToast();
   const isEditing = !!subscription;
+  const createMutation = useCreateSubscription();
+  const updateMutation = useUpdateSubscription();
 
   const form = useForm<InsertSubscriptionClient>({
     resolver: zodResolver(insertSubscriptionSchemaClient),
@@ -70,6 +73,16 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
         nextRenewalDate: new Date(subscription.nextRenewalDate),
         notes: subscription.notes || "",
       });
+    } else if (template) {
+      // Pre-fill form with template data
+      form.reset({
+        name: template.name,
+        cost: template.suggestedPrice,
+        billingCycle: template.billingCycle as "Monthly" | "Quarterly" | "Yearly",
+        category: template.category,
+        nextRenewalDate: new Date(),
+        notes: template.description || "",
+      });
     } else {
       form.reset({
         name: "",
@@ -80,18 +93,19 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
         notes: "",
       });
     }
-  }, [subscription, open]);
+  }, [subscription, template, open]);
 
-  const saveMutation = useMutation({
-    mutationFn: async (data: InsertSubscriptionClient) => {
+  const onSubmit = async (data: InsertSubscriptionClient) => {
+    try {
       if (isEditing) {
-        await apiRequest("PUT", `/api/subscriptions/${subscription.id}`, data);
+        await updateMutation.mutateAsync({
+          id: subscription.id,
+          data,
+        });
       } else {
-        await apiRequest("POST", "/api/subscriptions", data);
+        await createMutation.mutateAsync(data);
       }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
+      
       toast({
         title: isEditing ? "Subscription updated" : "Subscription added",
         description: isEditing
@@ -100,8 +114,7 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
       });
       onClose();
       form.reset();
-    },
-    onError: (error: any) => {
+    } catch (error: any) {
       // Better error handling with specific messages
       let errorMessage = "Failed to save subscription. Please try again.";
       
@@ -120,11 +133,7 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
         title: "Error",
         description: errorMessage,
       });
-    },
-  });
-
-  const onSubmit = (data: InsertSubscriptionClient) => {
-    saveMutation.mutate(data);
+    }
   };
 
   return (
@@ -132,7 +141,7 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
       <DialogContent className="max-w-lg" data-testid="modal-subscription">
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? "Edit Subscription" : "Add New Subscription"}
+            {isEditing ? "Edit Subscription" : template ? `Add ${template.name}` : "Add New Subscription"}
           </DialogTitle>
         </DialogHeader>
 
@@ -287,10 +296,10 @@ export function SubscriptionModal({ open, onClose, subscription }: SubscriptionM
               </Button>
               <Button
                 type="submit"
-                disabled={saveMutation.isPending}
+                disabled={createMutation.isPending || updateMutation.isPending}
                 data-testid="button-save"
               >
-                {saveMutation.isPending ? "Saving..." : isEditing ? "Update" : "Add Subscription"}
+                {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : isEditing ? "Update" : "Add Subscription"}
               </Button>
             </DialogFooter>
           </form>

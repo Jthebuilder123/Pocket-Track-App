@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText, LogOut, LogIn, User, Upload, Crown } from "lucide-react";
@@ -16,13 +16,18 @@ import { SpendingCharts } from "@/components/spending-charts";
 import { UpcomingRenewals } from "@/components/upcoming-renewals";
 import { BankConnect } from "@/components/bank-connect";
 import { DetectedSubscriptions } from "@/components/detected-subscriptions";
-import { type Subscription, SUBSCRIPTION_CATEGORIES, BILLING_CYCLES } from "@shared/schema";
+import { GuestBanner } from "@/components/guest-banner";
+import { TemplateBrowser } from "@/components/template-browser";
+import { type Subscription, type SubscriptionTemplate, SUBSCRIPTION_CATEGORIES, BILLING_CYCLES } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscriptions } from "@/hooks/useSubscriptions";
+import { migrateGuestSubscriptions, hasGuestData } from "@/lib/migrateGuestData";
 
 export function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | undefined>();
+  const [templateData, setTemplateData] = useState<SubscriptionTemplate | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [billingFilter, setBillingFilter] = useState<string>("all");
@@ -30,15 +35,62 @@ export function DashboardPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const { data: subscriptions = [], isLoading } = useQuery<Subscription[]>({
-    queryKey: ["/api/subscriptions"],
-  });
+  const { subscriptions, isLoading, isGuest, refetch } = useSubscriptions();
+  const migrationTriggered = useRef(false);
 
   // Check authentication status
   const { data: user } = useQuery<{ email: string } | null>({
     queryKey: ["/api/auth/me"],
     retry: false,
   });
+
+  // Auto-migrate guest data when user signs up
+  useEffect(() => {
+    const attemptMigration = async () => {
+      if (user && !isGuest && hasGuestData() && !migrationTriggered.current) {
+        migrationTriggered.current = true;
+        
+        toast({
+          title: "Migrating your data...",
+          description: "Transferring your local subscriptions to your account",
+        });
+
+        try {
+          const result = await migrateGuestSubscriptions();
+          
+          if (result.success) {
+            toast({
+              title: "Migration complete!",
+              description: `Successfully migrated ${result.migrated} subscription${result.migrated !== 1 ? 's' : ''} to your account`,
+            });
+          } else {
+            toast({
+              title: "Partial migration",
+              description: `Migrated ${result.migrated} subscriptions, ${result.failed} failed. Failed items remain in guest storage for retry. ${result.errors && result.errors.length > 0 ? 'Check console for details.' : ''}`,
+              variant: "destructive",
+              duration: 10000, // Show longer for important info
+            });
+            
+            // Log detailed errors to console for debugging
+            if (result.errors) {
+              console.error("Migration errors:", result.errors);
+            }
+          }
+          
+          // Refresh subscriptions to show migrated data
+          refetch();
+        } catch (error) {
+          toast({
+            title: "Migration failed",
+            description: "Failed to migrate your subscriptions. Please contact support.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    attemptMigration();
+  }, [user, isGuest, toast, refetch]);
 
   // FIX: Logout mutation - updated to match backend GET /api/logout endpoint
   const logoutMutation = useMutation({
@@ -89,17 +141,26 @@ export function DashboardPage() {
 
   const handleEdit = (subscription: Subscription) => {
     setEditingSubscription(subscription);
+    setTemplateData(undefined);
     setIsModalOpen(true);
   };
 
   const handleAddNew = () => {
     setEditingSubscription(undefined);
+    setTemplateData(undefined);
+    setIsModalOpen(true);
+  };
+
+  const handleSelectTemplate = (template: SubscriptionTemplate) => {
+    setEditingSubscription(undefined);
+    setTemplateData(template);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingSubscription(undefined);
+    setTemplateData(undefined);
   };
 
   const escapeCsvField = (field: string): string => {
@@ -265,6 +326,13 @@ export function DashboardPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Guest Banner */}
+        {isGuest && (
+          <div className="mb-6">
+            <GuestBanner />
+          </div>
+        )}
+
         {/* Page Header */}
         <div className="mb-8">
           <h2 className="text-3xl font-semibold mb-2">Dashboard</h2>
@@ -327,6 +395,9 @@ export function DashboardPage() {
             <TabsTrigger value="subscriptions" data-testid="tab-subscriptions">
               My Subscriptions
             </TabsTrigger>
+            <TabsTrigger value="templates" data-testid="tab-templates">
+              Browse Templates
+            </TabsTrigger>
             <TabsTrigger value="detected" data-testid="tab-detected">
               Detected
             </TabsTrigger>
@@ -339,12 +410,12 @@ export function DashboardPage() {
           <TabsContent value="subscriptions" className="mt-6 space-y-8">
             {/* Charts Section */}
             {activeSubscriptions.length > 0 && (
-              <SpendingCharts subscriptions={activeSubscriptions} />
+              <SpendingCharts subscriptions={activeSubscriptions as Subscription[]} />
             )}
 
             {/* Upcoming Renewals */}
             {activeSubscriptions.length > 0 && (
-              <UpcomingRenewals subscriptions={activeSubscriptions} />
+              <UpcomingRenewals subscriptions={activeSubscriptions as Subscription[]} />
             )}
 
             {/* Filters and Search */}
@@ -469,13 +540,18 @@ export function DashboardPage() {
                   {filteredSubscriptions.map((subscription) => (
                     <SubscriptionCard
                       key={subscription.id}
-                      subscription={subscription}
+                      subscription={subscription as Subscription}
                       onEdit={handleEdit}
                     />
                   ))}
                 </div>
               )}
             </div>
+          </TabsContent>
+
+          {/* Browse Templates Tab */}
+          <TabsContent value="templates" className="mt-6">
+            <TemplateBrowser onSelectTemplate={handleSelectTemplate} />
           </TabsContent>
 
           {/* Detected Subscriptions Tab */}
@@ -495,6 +571,7 @@ export function DashboardPage() {
         open={isModalOpen}
         onClose={handleCloseModal}
         subscription={editingSubscription}
+        template={templateData}
       />
 
       {/* Import Modal */}

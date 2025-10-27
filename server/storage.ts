@@ -1,4 +1,4 @@
-import { type Subscription, type InsertSubscription, type InsertHistory, type SubscriptionHistory, type BankConnection, type DetectedSubscription, type InsertDetectedSubscription, type User, type EmailSignup, type InsertEmailSignup, type Webhook, type InsertWebhook, type NotificationPreferences, type InsertNotificationPreferences, subscriptions, subscriptionHistory, bankConnections, detectedSubscriptions, users, emailSignups, webhooks, notificationPreferences } from "@shared/schema";
+import { type Subscription, type InsertSubscription, type InsertHistory, type SubscriptionHistory, type BankConnection, type DetectedSubscription, type InsertDetectedSubscription, type User, type EmailSignup, type InsertEmailSignup, type Webhook, type InsertWebhook, type NotificationPreferences, type InsertNotificationPreferences, type SubscriptionTemplate, subscriptions, subscriptionHistory, bankConnections, detectedSubscriptions, users, emailSignups, webhooks, notificationPreferences, subscriptionTemplates } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql as drizzleSql } from "drizzle-orm";
 import type { Transaction } from "plaid";
@@ -56,6 +56,12 @@ export interface IStorage {
   // Notification preferences operations
   getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined>;
   upsertNotificationPreferences(prefs: InsertNotificationPreferences): Promise<NotificationPreferences>;
+  
+  // Subscription template operations
+  getAllTemplates(): Promise<SubscriptionTemplate[]>;
+  getTemplate(id: string): Promise<SubscriptionTemplate | undefined>;
+  searchTemplates(query: string): Promise<SubscriptionTemplate[]>;
+  getTemplatesByCategory(category: string): Promise<SubscriptionTemplate[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -512,6 +518,44 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return prefs;
+  }
+
+  // Subscription template operations
+  async getAllTemplates(): Promise<SubscriptionTemplate[]> {
+    return await db
+      .select()
+      .from(subscriptionTemplates)
+      .orderBy(desc(subscriptionTemplates.popularity), subscriptionTemplates.name);
+  }
+
+  async getTemplate(id: string): Promise<SubscriptionTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(subscriptionTemplates)
+      .where(eq(subscriptionTemplates.id, id));
+    return template || undefined;
+  }
+
+  async searchTemplates(query: string): Promise<SubscriptionTemplate[]> {
+    const lowerQuery = query.toLowerCase();
+    const allTemplates = await db.select().from(subscriptionTemplates);
+    return allTemplates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(lowerQuery) ||
+        t.category.toLowerCase().includes(lowerQuery) ||
+        t.description?.toLowerCase().includes(lowerQuery)
+    ).sort((a, b) => {
+      // Sort by popularity (descending)
+      return parseInt(b.popularity) - parseInt(a.popularity);
+    });
+  }
+
+  async getTemplatesByCategory(category: string): Promise<SubscriptionTemplate[]> {
+    return await db
+      .select()
+      .from(subscriptionTemplates)
+      .where(eq(subscriptionTemplates.category, category))
+      .orderBy(desc(subscriptionTemplates.popularity), subscriptionTemplates.name);
   }
 }
 
