@@ -125,17 +125,21 @@ export function BankConnect() {
   // CAP: Set up Plaid return handler for Capacitor
   useEffect(() => {
     if (isCapacitor()) {
-      handlePlaidReturn(() => {
-        // CAP: When returning from Plaid in Capacitor, refresh connections
-        queryClient.invalidateQueries({ queryKey: ["/api/bank-connections"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/detected-subscriptions"] });
-        toast({
-          title: "Bank Connected",
-          description: "Successfully connected your bank account",
-        });
+      handlePlaidReturn((publicToken) => {
+        // CAP: When returning from Plaid in Capacitor, exchange the token
+        // CAP: Backend will fetch institution/account details from Plaid API
+        if (publicToken) {
+          console.log('CAP: Plaid OAuth successful, exchanging public_token...');
+          exchangeTokenMutation.mutate({
+            public_token: publicToken,
+            // CAP: Don't pass institution/account details - backend will fetch them
+          });
+        } else {
+          console.log('CAP: Plaid OAuth canceled or failed');
+        }
       });
     }
-  }, [toast]);
+  }, [exchangeTokenMutation]);
 
   const handleConnect = () => {
     // CAP: In Capacitor, open Plaid Link in system browser

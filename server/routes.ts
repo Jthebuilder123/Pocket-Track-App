@@ -8,7 +8,7 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { insertSubscriptionSchema, cancelSubscriptionSchema, insertEmailSignupSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
-import { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getInstitution } from "./plaid";
+import { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getInstitution, plaidClient } from "./plaid";
 import { z } from "zod";
 import logger from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -490,18 +490,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Exchange public token for access token and save bank connection
+  // CAP: Updated to support both web (with metadata) and Capacitor (fetch metadata server-side)
   app.post("/api/plaid/exchange-token", requireAuth, checkBankConnectionLimit, async (req: AuthRequest, res) => {
     try {
       const userId = req.user!.claims.sub;
 
+      // CAP: Make institution/account details optional for Capacitor OAuth flow
       const schema = z.object({
         public_token: z.string(),
-        institution_id: z.string(),
-        institution_name: z.string(),
+        institution_id: z.string().optional(),
+        institution_name: z.string().optional(),
         accounts: z.array(z.object({
           id: z.string(),
           name: z.string(),
-        })),
+        })).optional(),
       });
       
       const result = schema.safeParse(req.body);
@@ -511,15 +513,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { public_token, institution_id, institution_name, accounts } = result.data;
       
+      // Exchange public token for access token
       const { accessToken, itemId } = await exchangePublicToken(public_token);
+      
+      // CAP: If institution details not provided, fetch from Plaid API
+      let finalInstitutionId = institution_id;
+      let finalInstitutionName = institution_name;
+      let finalAccounts = accounts;
+      
+      if (!finalInstitutionId || !finalInstitutionName || !finalAccounts) {
+        logger.info("Fetching institution and account details from Plaid API");
+        
+        // Fetch accounts to get institution_id
+        const accountsData = await getAccounts(accessToken);
+        finalAccounts = accountsData.map(acc => ({ id: acc.account_id, name: acc.name }));
+        
+        // Get institution details from first account's institution
+        if (accountsData.length > 0 && accountsData[0].type) {
+          // Get item to find institution_id
+          const itemResponse = await plaidClient.itemGet({ access_token: accessToken });
+          finalInstitutionId = itemResponse.data.item.institution_id || 'unknown';
+          
+          // Fetch institution name
+          if (finalInstitutionId && finalInstitutionId !== 'unknown') {
+            const institutionData = await getInstitution(finalInstitutionId);
+            finalInstitutionName = institutionData.name;
+          } else {
+            finalInstitutionName = 'Unknown Bank';
+          }
+        }
+      }
       
       const connection = await storage.createBankConnection({
         userId,
-        institutionId: institution_id,
-        institutionName: institution_name,
+        institutionId: finalInstitutionId || 'unknown',
+        institutionName: finalInstitutionName || 'Unknown Bank',
         accessToken,
         itemId,
-        accountIds: accounts.map(a => a.id),
+        accountIds: finalAccounts ? finalAccounts.map(a => a.id) : [],
         lastSyncedAt: null,
       });
       

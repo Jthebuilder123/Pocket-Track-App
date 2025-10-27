@@ -53,7 +53,8 @@ export const closeSystemBrowser = async (): Promise<void> => {
 
 // CAP: Handle deep link return from Plaid
 // This will be called when user returns from Plaid OAuth flow
-export const handlePlaidReturn = (callback: (linkToken?: string) => void) => {
+// Note: Plaid OAuth only returns public_token in redirect URL, not full metadata
+export const handlePlaidReturn = (callback: (publicToken?: string) => void) => {
   if (!isCapacitor()) return;
 
   // CAP: Listen for app URL open (deep link)
@@ -62,17 +63,28 @@ export const handlePlaidReturn = (callback: (linkToken?: string) => void) => {
       const url = event.url;
       
       // CAP: Check if it's a Plaid return URL
-      if (url.includes('plaid') || url.includes('pockettrack://plaid')) {
-        console.log('CAP: Plaid return detected:', url);
+      if (url.includes('callback')) {
+        console.log('CAP: Plaid callback detected:', url);
         
-        // CAP: Extract link token from URL if present
+        // CAP: Extract public_token from URL
         const urlParams = new URLSearchParams(url.split('?')[1]);
-        const linkToken = urlParams.get('link_token');
+        const publicToken = urlParams.get('public_token');
+        const oauth_state_id = urlParams.get('oauth_state_id');
         
-        // CAP: Close the browser and call callback
-        closeSystemBrowser().then(() => {
-          callback(linkToken || undefined);
-        });
+        // CAP: Plaid returns either public_token (success) or error codes (failure)
+        if (publicToken) {
+          console.log('CAP: Plaid OAuth successful, got public_token');
+          // CAP: Close the browser and call callback with public_token
+          closeSystemBrowser().then(() => {
+            callback(publicToken);
+          });
+        } else {
+          // CAP: No public token, user may have canceled or encountered error
+          console.log('CAP: Plaid OAuth completed without public_token');
+          closeSystemBrowser().then(() => {
+            callback(undefined);
+          });
+        }
       }
     });
   });
