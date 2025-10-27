@@ -39,8 +39,14 @@ export function BankConnect() {
   });
 
   // Exchange public token mutation
+  // CAP: Make institution/account fields optional for Capacitor OAuth flow
   const exchangeTokenMutation = useMutation({
-    mutationFn: async (data: { public_token: string; institution_id: string; institution_name: string; accounts: Array<{ id: string; name: string }> }) => {
+    mutationFn: async (data: { 
+      public_token: string; 
+      institution_id?: string; 
+      institution_name?: string; 
+      accounts?: Array<{ id: string; name: string }> 
+    }) => {
       const response = await apiRequest("POST", "/api/plaid/exchange-token", data);
       return response.json();
     },
@@ -107,12 +113,29 @@ export function BankConnect() {
   });
 
   const onSuccess = useCallback((publicToken: string, metadata: any) => {
-    exchangeTokenMutation.mutate({
+    // CAP: Only include institution/account metadata if available from Plaid
+    // CAP: If missing, backend will fetch from Plaid API
+    const payload: {
+      public_token: string;
+      institution_id?: string;
+      institution_name?: string;
+      accounts?: Array<{ id: string; name: string }>;
+    } = {
       public_token: publicToken,
-      institution_id: metadata.institution?.institution_id || "",
-      institution_name: metadata.institution?.name || "Unknown Bank",
-      accounts: metadata.accounts || [],
-    });
+    };
+
+    // Add metadata only if available
+    if (metadata?.institution?.institution_id) {
+      payload.institution_id = metadata.institution.institution_id;
+    }
+    if (metadata?.institution?.name) {
+      payload.institution_name = metadata.institution.name;
+    }
+    if (metadata?.accounts && metadata.accounts.length > 0) {
+      payload.accounts = metadata.accounts;
+    }
+
+    exchangeTokenMutation.mutate(payload);
   }, [exchangeTokenMutation]);
 
   const config = {
