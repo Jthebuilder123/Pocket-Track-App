@@ -21,12 +21,15 @@ The application features a responsive design built with React and Shadcn UI, sty
 - **Authentication**: Replit Auth (OpenID Connect) supporting Google OAuth, GitHub, X (Twitter), Apple, and email/password login via Passport.js with session management.
 - **Key Features**:
     - Comprehensive subscription lifecycle management (add, edit, delete, cancel) with ownership verification.
+    - **Cancellation Assistance**: Subscriptions can include cancellation help (URL, email, phone, step-by-step instructions) in an expandable form section, with a "Cancellation Help" dialog on subscription cards.
     - Visual analytics dashboard.
     - Export and import functionalities (CSV/JSON) gated by plan tier.
+    - **Bank Statement Import**: Upload bank statements (PDF/CSV/Excel) to automatically detect recurring transactions and suggest subscriptions for approval. Uses pdf-parse, papaparse, and xlsx libraries with pattern analysis.
     - Webhook system for external integrations gated by plan tier.
     - Email notification preferences for renewal reminders.
     - Audit trail for subscription changes.
     - Three-tier pricing system (Free, Essentials, Pro) with feature gates enforcing per-user limits.
+    - **Auto-sync Feature Flag**: Premium (Pro) plan includes `autoSyncEnabled` flag for future automatic bank transaction syncing capability.
 - **PWA**: Converted to a Progressive Web App with offline support, installability, and standalone mode using a web app manifest and service worker.
 - **Native Mobile Apps**: Wrapped as native iOS and Android applications using Capacitor, enabling app store distribution and secure OAuth flows via system browsers (SFSafariViewController/Custom Tabs) and deep linking.
 
