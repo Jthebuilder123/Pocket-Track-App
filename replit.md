@@ -1,21 +1,7 @@
 # PocketTrack - Subscription Management Tracker
 
 ## Overview
-PocketTrack is a modern web application designed to help users efficiently track and manage their recurring subscriptions. It provides tools for monitoring spending, visualizing costs by category, and staying informed about upcoming renewals. The project aims to offer a comprehensive solution for personal finance management focused on subscription services.
-
-## Recent Changes (October 26, 2025)
-- **PWA Conversion**: Converted PocketTrack into a Progressive Web App (PWA) with full offline support and installability on iOS/Android devices. Added web app manifest, service worker with caching strategy, app icons (192x192, 512x512, 180x180), and iOS-specific meta tags for standalone mode. No app logic was modified - only PWA infrastructure added.
-- **Pricing Update**: Reduced pricing to be more accessible - Essentials now $4.99/mo ($39/yr, save 35%), Pro now $7.99/mo ($59/yr, save 38%). Pricing changes automatically apply via dynamic Stripe checkout sessions.
-- **Feature Limits Expanded**: Free tier now includes 10 subscriptions (up from 5), 1 bank connection (up from 0), and data import capability. Essentials tier now includes 3 bank connections (up from 1).
-- **Page Flickering Fix**: Fixed infinite request loop caused by catch-all route using `window.location.replace()`. Changed to wouter's `Redirect` component for smooth client-side navigation.
-- **Plaid Error Handling**: Improved error handling for missing Plaid credentials. Server no longer crashes when `PLAID_CLIENT_ID` and `PLAID_SECRET` are missing - instead shows clear error message.
-- **Deployment Documentation**: Added comprehensive guide for configuring environment variables in published deployments, especially Plaid credentials.
-- **Authentication Migration Complete**: Successfully migrated from JWT-based authentication to Replit Auth (OpenID Connect) with Passport.js sessions
-- **User Identification**: All protected routes now use `req.user.claims.sub` (userId) instead of email for user identification
-- **Storage Layer Updated**: `updateUserPlan` and `updateUserStripeInfo` now accept userId instead of email
-- **New Storage Method**: Added `getUserByStripeCustomerId` for Stripe webhook integration
-- **Multi-Tenant Security**: All routes enforce data isolation by filtering on authenticated user's ID
-- **Testing**: E2E tests confirm full CRUD functionality for subscriptions with Replit Auth
+PocketTrack is a modern web application designed to help users efficiently track and manage their recurring subscriptions. It provides tools for monitoring spending, visualizing costs by category, and staying informed about upcoming renewals. The project aims to offer a comprehensive solution for personal finance management focused on subscription services. It is available as a Progressive Web App (PWA) and native iOS/Android applications.
 
 ## User Preferences
 - Clean, modern SaaS dashboard aesthetic
@@ -33,8 +19,6 @@ The application features a responsive design built with React and Shadcn UI, sty
 - **Backend**: Express.js with TypeScript, providing a robust API for all functionalities.
 - **Database**: PostgreSQL with Drizzle ORM for persistent data storage with full multi-tenant data isolation.
 - **Authentication**: Replit Auth (OpenID Connect) supporting Google OAuth, GitHub, X (Twitter), Apple, and email/password login via Passport.js with session management.
-- **Plaid Integration**: Secure bank connectivity via the Plaid API for automatic subscription detection from transaction history.
-- **Stripe Integration**: Complete payment processing with Checkout sessions and webhook handling for plan upgrades.
 - **Key Features**:
     - Comprehensive subscription lifecycle management (add, edit, delete, cancel) with ownership verification.
     - Visual analytics dashboard.
@@ -43,122 +27,14 @@ The application features a responsive design built with React and Shadcn UI, sty
     - Email notification preferences for renewal reminders.
     - Audit trail for subscription changes.
     - Three-tier pricing system (Free, Essentials, Pro) with feature gates enforcing per-user limits.
+- **PWA**: Converted to a Progressive Web App with offline support, installability, and standalone mode using a web app manifest and service worker.
+- **Native Mobile Apps**: Wrapped as native iOS and Android applications using Capacitor, enabling app store distribution and secure OAuth flows via system browsers (SFSafariViewController/Custom Tabs) and deep linking.
 
 ### System Design Choices
 The system is built with a clear separation of concerns between client and server. Shared types and schemas are centralized. Authentication includes rate limiting and secure session management. Production readiness features include health monitoring, structured logging, robust error handling, and environment variable validation for security.
 
 ## External Dependencies
-- **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection.
-  - Requires `PLAID_CLIENT_ID` and `PLAID_SECRET` environment variables
-  - Development uses sandbox environment (test data only)
-  - Production requires Plaid production credentials for real bank connections
-- **Stripe**: Payment processing for subscription plans with webhook-based plan activation.
-  - Requires `STRIPE_SECRET_KEY` environment variable
-  - Pricing is defined in `shared/pricing.ts` and dynamically created in Stripe checkout sessions
-  - No manual Stripe product/price configuration needed - prices are created on-the-fly via Stripe's price_data API
+- **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection. Requires `PLAID_CLIENT_ID` and `PLAID_SECRET`.
+- **Stripe**: Payment processing for subscription plans with webhook-based plan activation. Requires `STRIPE_SECRET_KEY`. Pricing is defined dynamically in `shared/pricing.ts`.
 - **PostgreSQL**: Relational database for all application data storage with proper multi-tenant isolation.
-- **SendGrid**: (Configurable) for email delivery of magic links and notifications.
-  - Requires `SENDGRID_API_KEY` environment variable (optional)
-
-### Configuring Environment Variables for Published Deployment
-
-When you publish your app, environment variables from development are NOT automatically copied. You must add them manually to your published deployment:
-
-**To add Plaid credentials to your published app:**
-1. Go to your Replit project
-2. Click on the "Deployments" tab
-3. Click on your active deployment
-4. Navigate to "Environment variables" or "Secrets"
-5. Add the following variables:
-   - `PLAID_CLIENT_ID`: Your Plaid client ID
-   - `PLAID_SECRET`: Your Plaid secret key
-   - `PLAID_ENV`: Set to `sandbox` for testing or `production` for real banks (defaults to `sandbox` if not set)
-6. Save and redeploy your application
-
-**Important Notes:**
-- For testing: Use Plaid sandbox credentials (these work with test banks only) and set `PLAID_ENV=sandbox`
-- For production: You need Plaid production credentials (requires Plaid approval for real bank connections) and set `PLAID_ENV=production`
-- The app will run without Plaid credentials but bank connection features will show a configuration error message
-
-## Pricing & Feature Gates
-The application implements a three-tier pricing model with strict feature enforcement:
-
-### Free Tier ($0/month)
-- 10 active subscriptions maximum
-- 1 bank connection
-- Basic analytics dashboard
-- Cancellation helper
-- Data import (CSV/Excel)
-- No data export
-- No email notifications
-- No webhook integrations
-
-### Essentials Tier ($4.99/month or $39/year)
-- 25 active subscriptions maximum
-- 3 bank connections
-- Full analytics dashboard
-- Cancellation helper
-- CSV/JSON export and import
-- Email notifications
-- No webhook integrations
-- Most popular tier
-- Save 35% with yearly billing
-
-### Pro Tier ($7.99/month or $59/year)
-- Unlimited subscriptions
-- Unlimited bank connections
-- Advanced analytics
-- Cancellation helper
-- CSV/JSON export and import
-- Email notifications
-- Webhook integrations
-- Priority support
-- Save 38% with yearly billing
-
-All feature limits are enforced at the API level via middleware that verifies user plan and current usage. Multi-tenant data isolation ensures users can only access their own subscriptions and bank connections.
-
-## Progressive Web App (PWA) Features
-
-PocketTrack is now a full-featured Progressive Web App that can be installed on your device for an app-like experience.
-
-### PWA Features
-- **Offline Support**: Service worker caches essential assets for offline functionality
-- **Installable**: Add to home screen on iOS, Android, and desktop browsers
-- **Standalone Mode**: Runs like a native app without browser chrome
-- **Fast Loading**: Cached assets load instantly on repeat visits
-- **App Icons**: Custom icons for all platforms (192x192, 512x512, 180x180)
-
-### Installation Instructions
-
-#### iOS (iPhone/iPad)
-1. Open PocketTrack in Safari (must use Safari, not Chrome)
-2. Tap the Share button (square with arrow pointing up)
-3. Scroll down and tap "Add to Home Screen"
-4. Tap "Add" in the top-right corner
-5. The app icon will appear on your home screen
-6. Open from home screen for standalone experience
-
-#### Android
-1. Open PocketTrack in Chrome
-2. Tap the three-dot menu in the top-right
-3. Select "Add to Home screen" or "Install app"
-4. Tap "Install" in the popup
-5. The app icon will appear on your home screen
-6. Open from home screen for standalone experience
-
-#### Desktop (Chrome, Edge, Brave)
-1. Open PocketTrack in your browser
-2. Look for the install icon in the address bar (+ or computer icon)
-3. Click the install button
-4. Click "Install" in the popup
-5. The app will open in its own window
-
-### PWA Technical Implementation
-- **Manifest**: `/manifest.json` defines app metadata, icons, and display mode
-- **Service Worker**: `/sw.js` handles caching and offline support
-- **Caching Strategy**: Network-first for API calls, cache-first for static assets
-- **iOS Support**: Apple-specific meta tags for standalone mode and custom status bar
-- **All Changes Documented**: Every PWA change marked with `# PWA:` comments
-
-## Integration Notes
-- **Google Calendar**: Integration available via Replit connector (connector:ccfg_google-calendar_DDDBAC03DE404369B74F32E78D) but not currently set up. Can be configured in the future to sync subscription renewal dates to calendar events.
+- **SendGrid**: (Configurable) for email delivery of magic links and notifications. Requires `SENDGRID_API_KEY`.
