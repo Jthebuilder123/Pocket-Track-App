@@ -25,6 +25,7 @@ The application features a responsive design built with React and Shadcn UI, sty
     - Visual analytics dashboard.
     - Export and import functionalities (CSV/JSON) gated by plan tier.
     - **Bank Statement Import**: Upload bank statements (PDF/CSV/Excel) to automatically detect recurring transactions and suggest subscriptions for approval. Uses pdf-parse, papaparse, and xlsx libraries with pattern analysis.
+    - **Self-Tracking**: When users subscribe to Essentials or Pro plans, PocketTrack automatically creates a subscription entry in their dashboard to track their own PocketTrack subscription (with actual price, billing cycle, and renewal dates from Stripe).
     - Webhook system for external integrations gated by plan tier.
     - Email notification preferences for renewal reminders.
     - Audit trail for subscription changes.

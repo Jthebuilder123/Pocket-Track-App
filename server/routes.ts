@@ -1145,6 +1145,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 plan: planId,
                 subscriptionId: session.subscription,
               });
+
+              // Auto-create PocketTrack subscription entry for paid plans
+              if (planId !== PRICING_TIERS.FREE && session.subscription) {
+                try {
+                  // Fetch subscription details from Stripe to get billing interval
+                  const stripeSubscription = await stripe.subscriptions.retrieve(
+                    session.subscription as string
+                  );
+
+                  // Determine billing cycle and price
+                  const interval = stripeSubscription.items.data[0]?.plan.interval;
+                  const billingCycle = interval === "year" ? "Yearly" : "Monthly";
+                  const amount = stripeSubscription.items.data[0]?.plan.amount || 0;
+                  const price = (amount / 100).toFixed(2); // Convert cents to dollars
+
+                  // Get plan name
+                  const planDetails = PLANS.find(p => p.id === planId);
+                  const planName = planDetails?.name || planId;
+
+                  // Calculate next renewal date
+                  const nextRenewalDate = new Date(stripeSubscription.current_period_end * 1000);
+
+                  // Check if user already has a PocketTrack subscription
+                  const existingSubscriptions = await storage.getSubscriptionsByUserId(userId);
+                  const existingPocketTrack = existingSubscriptions.find(
+                    sub => sub.name.toLowerCase().includes('pockettrack')
+                  );
+
+                  if (existingPocketTrack) {
+                    // Update existing PocketTrack subscription
+                    await storage.updateSubscription(existingPocketTrack.id, {
+                      userId,
+                      name: `PocketTrack ${planName}`,
+                      cost: price,
+                      billingCycle,
+                      nextRenewalDate,
+                      category: "Software",
+                      notes: "PocketTrack subscription management service",
+                    });
+                    logger.info("Updated existing PocketTrack subscription", { userId, planId });
+                  } else {
+                    // Create new PocketTrack subscription
+                    await storage.createSubscription({
+                      userId,
+                      name: `PocketTrack ${planName}`,
+                      cost: price,
+                      billingCycle,
+                      nextRenewalDate,
+                      category: "Software",
+                      notes: "PocketTrack subscription management service",
+                    });
+                    logger.info("Created PocketTrack subscription entry", { userId, planId });
+                  }
+                } catch (subError) {
+                  logger.error("Error creating PocketTrack subscription entry", { 
+                    error: subError, 
+                    userId, 
+                    planId 
+                  });
+                  // Don't fail the whole webhook if subscription creation fails
+                }
+              }
             }
             break;
           }
