@@ -37,6 +37,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Replit Auth (Google OAuth + Email/Password)
   await setupAuth(app);
 
+  // Root health check endpoint (required for deployment)
+  app.get("/", async (_req, res) => {
+    res.status(200).json({ 
+      status: "ok",
+      service: "PocketTrack API",
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Health check endpoint
   app.get("/healthz", async (_req, res) => {
     res.status(200).json({ 
