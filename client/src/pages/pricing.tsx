@@ -9,6 +9,8 @@ import { useState, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+// CAP: Import Capacitor utilities for Stripe checkout in system browser
+import { isCapacitor, openInSystemBrowser, handleStripeReturn } from "@/lib/capacitorUtils";
 
 interface PlanFeatures {
   maxSubscriptions: number | null;
@@ -67,7 +69,13 @@ export default function Pricing() {
     },
     onSuccess: (data) => {
       if (data.url) {
-        window.location.href = data.url;
+        // CAP: In Capacitor, open Stripe Checkout in system browser
+        if (isCapacitor()) {
+          openInSystemBrowser(data.url);
+        } else {
+          // CAP: Web environment - normal redirect
+          window.location.href = data.url;
+        }
       }
     },
     onError: () => {
@@ -79,23 +87,49 @@ export default function Pricing() {
     },
   });
 
-  // Handle success/cancel from Stripe redirect
+  // CAP: Handle Stripe return in Capacitor
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("success") === "true") {
-      toast({
-        title: "Success!",
-        description: "Your subscription is now active. Enjoy your new features!",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/user/plan"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      navigate("/pricing");
-    } else if (params.get("canceled") === "true") {
-      toast({
-        title: "Checkout Canceled",
-        description: "Your checkout was canceled. No charges were made.",
-      });
-      navigate("/pricing");
+    if (isCapacitor()) {
+      handleStripeReturn(
+        () => {
+          // CAP: Success callback
+          toast({
+            title: "Success!",
+            description: "Your subscription is now active. Enjoy your new features!",
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/user/plan"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        },
+        () => {
+          // CAP: Cancel callback
+          toast({
+            title: "Checkout Canceled",
+            description: "Your checkout was canceled. No charges were made.",
+          });
+        }
+      );
+    }
+  }, [toast]);
+
+  // CAP: Handle success/cancel from Stripe redirect (web only)
+  useEffect(() => {
+    if (!isCapacitor()) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("success") === "true") {
+        toast({
+          title: "Success!",
+          description: "Your subscription is now active. Enjoy your new features!",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/user/plan"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        navigate("/pricing");
+      } else if (params.get("canceled") === "true") {
+        toast({
+          title: "Checkout Canceled",
+          description: "Your checkout was canceled. No charges were made.",
+        });
+        navigate("/pricing");
+      }
     }
   }, [toast, navigate]);
 

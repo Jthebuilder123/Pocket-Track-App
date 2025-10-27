@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { usePlaidLink } from "react-plaid-link";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Building2, RefreshCw, Unplug, AlertCircle } from "lucide-react";
@@ -9,6 +9,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type BankConnection } from "@shared/schema";
+// CAP: Import Capacitor utilities for native browser handling
+import { isCapacitor, openInSystemBrowser, getReturnUrl, handlePlaidReturn } from "@/lib/capacitorUtils";
 
 export function BankConnect() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
@@ -120,16 +122,46 @@ export function BankConnect() {
 
   const { open, ready } = usePlaidLink(config);
 
+  // CAP: Set up Plaid return handler for Capacitor
+  useEffect(() => {
+    if (isCapacitor()) {
+      handlePlaidReturn(() => {
+        // CAP: When returning from Plaid in Capacitor, refresh connections
+        queryClient.invalidateQueries({ queryKey: ["/api/bank-connections"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/detected-subscriptions"] });
+        toast({
+          title: "Bank Connected",
+          description: "Successfully connected your bank account",
+        });
+      });
+    }
+  }, [toast]);
+
   const handleConnect = () => {
-    if (linkToken && ready) {
-      open();
+    // CAP: In Capacitor, open Plaid Link in system browser
+    if (isCapacitor()) {
+      if (!linkToken) {
+        createLinkTokenMutation.mutate();
+        return;
+      }
+      
+      // CAP: Construct Plaid Link URL with return URL
+      const returnUrl = getReturnUrl('plaid');
+      const plaidUrl = `https://cdn.plaid.com/link/v2/stable/link.html?token=${linkToken}&redirect_uri=${encodeURIComponent(returnUrl)}`;
+      
+      openInSystemBrowser(plaidUrl);
     } else {
-      createLinkTokenMutation.mutate();
+      // CAP: Web environment - use normal Plaid Link SDK
+      if (linkToken && ready) {
+        open();
+      } else {
+        createLinkTokenMutation.mutate();
+      }
     }
   };
 
-  // Auto-open Plaid Link when token is ready
-  if (linkToken && ready && !createLinkTokenMutation.isPending) {
+  // CAP: Auto-open Plaid Link when token is ready (web only)
+  if (!isCapacitor() && linkToken && ready && !createLinkTokenMutation.isPending) {
     open();
   }
 
