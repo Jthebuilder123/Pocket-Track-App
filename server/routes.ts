@@ -37,22 +37,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Replit Auth (Google OAuth + Email/Password)
   await setupAuth(app);
 
-  // Root health check endpoint (required for deployment)
-  app.get("/", async (_req, res) => {
-    res.status(200).json({ 
-      status: "ok",
-      service: "PocketTrack API",
-      timestamp: new Date().toISOString()
-    });
+  // Root health check (HEAD request for deployment - doesn't interfere with frontend GET)
+  app.head("/", (_req, res) => {
+    res.status(200).end();
   });
 
-  // Health check endpoint
+  // Health check endpoints (for deployment health checks)
   app.get("/healthz", async (_req, res) => {
     res.status(200).json({ 
       status: "ok", 
       timestamp: new Date().toISOString(),
       uptime: process.uptime()
     });
+  });
+  
+  app.get("/health", async (_req, res) => {
+    res.status(200).send("OK");
   });
 
   // Diagnostics endpoint
