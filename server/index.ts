@@ -95,7 +95,7 @@ process.on('SIGINT', () => {
       const message = err.message || "Internal Server Error";
 
       res.status(status).json({ message });
-      throw err;
+      log(`Error: ${err.message}`);
     });
 
     // importantly only setup vite in development and after
@@ -143,6 +143,10 @@ process.on('SIGINT', () => {
     server.on('error', (error) => {
       log(`Server error: ${error.message}`);
     });
+
+    // Prevent the async function from completing
+    // This keeps the Node.js process alive
+    await new Promise(() => {});
     
   } catch (error: any) {
     log(`Failed to start server: ${error.message}`);
