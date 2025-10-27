@@ -24,25 +24,17 @@ function Router() {
     );
   }
 
+  // Guest mode enabled: Dashboard is accessible to everyone
   return (
     <Switch>
-      {!isAuthenticated ? (
-        <>
-          <Route path="/login" component={Login} />
-          <Route path="/" component={Login} />
-          <Route component={Login} />
-        </>
-      ) : (
-        <>
-          <Route path="/" component={DashboardPage} />
-          <Route path="/pricing" component={Pricing} />
-          <Route path="/click-test" component={ClickTest} />
-          {/* FIX: Use wouter Redirect for catch-all to prevent hard page reloads that cause flickering */}
-          <Route>
-            <Redirect to="/" />
-          </Route>
-        </>
-      )}
+      <Route path="/" component={DashboardPage} />
+      <Route path="/login" component={Login} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/click-test" component={ClickTest} />
+      {/* FIX: Use wouter Redirect for catch-all to prevent hard page reloads that cause flickering */}
+      <Route>
+        <Redirect to="/" />
+      </Route>
     </Switch>
   );
 }

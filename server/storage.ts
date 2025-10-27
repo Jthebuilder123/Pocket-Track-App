@@ -390,6 +390,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: { id: string; email?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User> {
+    // Check if user exists by ID or email first
+    const existingById = await this.getUser(userData.id);
+    const existingByEmail = userData.email ? await this.getUserByEmail(userData.email) : undefined;
+    
+    // If user exists by either ID or email, update them
+    if (existingById || existingByEmail) {
+      const userId = existingById?.id || existingByEmail!.id;
+      const [user] = await db
+        .update(users)
+        .set({
+          // Update ID if it doesn't match (email match case)
+          id: userData.id,
+          email: userData.email?.toLowerCase() || null,
+          firstName: userData.firstName || null,
+          lastName: userData.lastName || null,
+          profileImageUrl: userData.profileImageUrl || null,
+          updatedAt: drizzleSql`now()`,
+        })
+        .where(eq(users.id, userId))
+        .returning();
+      return user;
+    }
+    
+    // Insert new user if doesn't exist
     const [user] = await db
       .insert(users)
       .values({
@@ -399,16 +423,6 @@ export class DatabaseStorage implements IStorage {
         lastName: userData.lastName || null,
         profileImageUrl: userData.profileImageUrl || null,
         plan: "free",
-      })
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          email: userData.email?.toLowerCase() || null,
-          firstName: userData.firstName || null,
-          lastName: userData.lastName || null,
-          profileImageUrl: userData.profileImageUrl || null,
-          updatedAt: drizzleSql`now()`,
-        },
       })
       .returning();
     
