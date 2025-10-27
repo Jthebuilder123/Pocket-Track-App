@@ -22,6 +22,25 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- CAP: Custom URL scheme for deep linking (Plaid/Stripe returns) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pockettrack" />
+            </intent-filter>
+
+            <!-- CAP: App Links for https deep linking -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="pockettrack.app" />
+                <data android:pathPrefix="/plaid" />
+                <data android:pathPrefix="/stripe" />
+            </intent-filter>
+
         </activity>
 
         <provider
