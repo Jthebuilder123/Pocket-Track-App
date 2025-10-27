@@ -37,12 +37,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Replit Auth (Google OAuth + Email/Password)
   await setupAuth(app);
 
-  // Root health check (HEAD request for deployment - doesn't interfere with frontend GET)
+  // Root endpoint - responds to health checks but falls through for browser requests
+  app.get("/", (req, res, next) => {
+    // If this is a health check request (checks Accept header or User-Agent)
+    const acceptHeader = req.get('Accept') || '';
+    const userAgent = req.get('User-Agent') || '';
+    
+    // Health check systems typically accept text/plain or any, not text/html
+    const isHealthCheck = 
+      !acceptHeader.includes('text/html') || 
+      userAgent.includes('HealthChecker') ||
+      userAgent.includes('kube-probe') ||
+      userAgent.includes('Prometheus');
+    
+    if (isHealthCheck && !acceptHeader.includes('text/html')) {
+      return res.status(200).send('OK');
+    }
+    
+    // Otherwise, let it fall through to Vite/static serving
+    next();
+  });
+
   app.head("/", (_req, res) => {
     res.status(200).end();
   });
 
-  // Health check endpoints (for deployment health checks)
+  // Additional health check endpoints
   app.get("/healthz", async (_req, res) => {
     res.status(200).json({ 
       status: "ok", 
