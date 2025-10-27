@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SubscriptionCard } from "@/components/subscription-card";
 import { SubscriptionModal } from "@/components/subscription-modal";
 import { ImportSubscriptions } from "@/components/import-subscriptions";
+import { ImportBankStatement } from "@/components/import-bank-statement";
 import { SpendingCharts } from "@/components/spending-charts";
 import { UpcomingRenewals } from "@/components/upcoming-renewals";
 import { BankConnect } from "@/components/bank-connect";
@@ -26,6 +27,7 @@ import { migrateGuestSubscriptions, hasGuestData } from "@/lib/migrateGuestData"
 export function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isBankStatementImportOpen, setIsBankStatementImportOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | undefined>();
   const [templateData, setTemplateData] = useState<SubscriptionTemplate | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
@@ -292,10 +294,24 @@ export function DashboardPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="outline" onClick={() => setIsImportOpen(true)} data-testid="button-import">
-              <Upload className="w-4 h-4 mr-2" />
-              Import
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" data-testid="button-import">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setIsImportOpen(true)} data-testid="menuitem-import-csv">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Import CSV/Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsBankStatementImportOpen(true)} data-testid="menuitem-import-statement">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Import Bank Statement
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={handleAddNew} data-testid="button-add-subscription">
               <Plus className="w-4 h-4 mr-2" />
               Add Subscription
@@ -578,6 +594,12 @@ export function DashboardPage() {
       <ImportSubscriptions
         open={isImportOpen}
         onClose={() => setIsImportOpen(false)}
+      />
+
+      {/* Bank Statement Import Modal */}
+      <ImportBankStatement
+        open={isBankStatementImportOpen}
+        onClose={() => setIsBankStatementImportOpen(false)}
       />
     </div>
   );

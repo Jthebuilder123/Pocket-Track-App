@@ -469,6 +469,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== Bank Statement Import Routes =====
+
+  // Configure multer for bank statement uploads (larger limit for PDFs)
+  const statementUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit for bank statements
+    },
+    fileFilter: (_req, file, cb) => {
+      const allowedMimeTypes = [
+        'application/pdf',
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ];
+      if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only PDF, CSV, and Excel files are allowed.'));
+      }
+    },
+  });
+
+  // POST /api/bank-statements/upload - Parse bank statement and detect subscriptions
+  app.post("/api/bank-statements/upload", requireAuth, statementUpload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const fileBuffer = req.file.buffer;
+      const fileType = req.file.mimetype;
+      let transactions: Array<{ date: string; merchant: string; amount: number }> = [];
+
+      // Parse PDF
+      if (fileType === 'application/pdf') {
+        try {
+          // Dynamic import for pdf-parse (CommonJS module)
+          const pdfParse = (await import('pdf-parse')).default;
+          const pdfData = await pdfParse(fileBuffer);
+          const text = pdfData.text;
+          
+          // Simple transaction pattern matching (this is a basic implementation)
+          // In production, you'd want more sophisticated parsing based on bank formats
+          const lines = text.split('\n');
+          const transactionPattern = /(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2})\s+(.+?)\s+[\$\-]?([\d,]+\.\d{2})/;
+          
+          for (const line of lines) {
+            const match = line.match(transactionPattern);
+            if (match) {
+              transactions.push({
+                date: match[1],
+                merchant: match[2].trim(),
+                amount: Math.abs(parseFloat(match[3].replace(/,/g, ''))),
+              });
+            }
+          }
+        } catch (pdfError) {
+          logger.error("Error parsing PDF", { error: pdfError });
+          return res.status(400).json({ error: "Failed to parse PDF. Please try converting it to CSV format." });
+        }
+      }
+      // Parse CSV
+      else if (fileType === 'text/csv') {
+        const csvText = fileBuffer.toString('utf-8');
+        const parsed = Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (header) => header.trim().toLowerCase(),
+        });
+        
+        for (const row of parsed.data as any[]) {
+          const date = row.date || row.transaction_date || row['posting date'] || '';
+          const merchant = row.description || row.merchant || row.name || row.payee || '';
+          const amount = row.amount || row.debit || row['transaction amount'] || '0';
+          
+          if (date && merchant && amount) {
+            transactions.push({
+              date,
+              merchant: merchant.trim(),
+              amount: Math.abs(parseFloat(amount.toString().replace(/[\$,]/g, ''))),
+            });
+          }
+        }
+      }
+      // Parse Excel
+      else if (
+        fileType === 'application/vnd.ms-excel' ||
+        fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ) {
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+        
+        for (const row of jsonData as any[]) {
+          const normalizedRow: any = {};
+          for (const key in row) {
+            normalizedRow[key.trim().toLowerCase()] = row[key];
+          }
+          
+          const date = normalizedRow.date || normalizedRow.transaction_date || normalizedRow['posting date'] || '';
+          const merchant = normalizedRow.description || normalizedRow.merchant || normalizedRow.name || normalizedRow.payee || '';
+          const amount = normalizedRow.amount || normalizedRow.debit || normalizedRow['transaction amount'] || '0';
+          
+          if (date && merchant && amount) {
+            transactions.push({
+              date,
+              merchant: merchant.trim(),
+              amount: Math.abs(parseFloat(amount.toString().replace(/[\$,]/g, ''))),
+            });
+          }
+        }
+      }
+
+      if (transactions.length === 0) {
+        return res.status(400).json({ error: "No transactions found in the statement" });
+      }
+
+      // Detect recurring subscriptions from transactions
+      const detectedSubs = await storage.detectSubscriptionsFromTransactions(transactions);
+      
+      res.json({
+        totalTransactions: transactions.length,
+        detectedSubscriptions: detectedSubs,
+      });
+    } catch (error) {
+      logger.error("Error parsing bank statement", { error });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to parse bank statement" });
+    }
+  });
+
+  // POST /api/bank-statements/confirm - Create subscriptions from selected detected ones
+  app.post("/api/bank-statements/confirm", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.claims.sub;
+
+      const schema = z.object({
+        subscriptionIds: z.array(z.string()),
+      });
+
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: fromZodError(result.error).toString() });
+      }
+
+      const { subscriptionIds } = result.data;
+
+      if (subscriptionIds.length === 0) {
+        return res.status(400).json({ error: "No subscriptions selected" });
+      }
+
+      // Create subscriptions from detected ones
+      const createdSubscriptions = [];
+      for (const detectedId of subscriptionIds) {
+        const detected = await storage.getDetectedSubscription(detectedId);
+        if (!detected) continue;
+
+        const nextRenewal = new Date();
+        if (detected.detectedBillingCycle === "Monthly") {
+          nextRenewal.setMonth(nextRenewal.getMonth() + 1);
+        } else if (detected.detectedBillingCycle === "Quarterly") {
+          nextRenewal.setMonth(nextRenewal.getMonth() + 3);
+        } else {
+          nextRenewal.setFullYear(nextRenewal.getFullYear() + 1);
+        }
+
+        const subscription = await storage.createSubscription({
+          userId,
+          name: detected.merchantName,
+          cost: detected.estimatedCost.toString(),
+          billingCycle: detected.detectedBillingCycle as "Monthly" | "Quarterly" | "Yearly",
+          category: detected.category || "Other",
+          nextRenewalDate: nextRenewal,
+          notes: `Imported from bank statement (${detected.confidence}% confidence)`,
+        });
+
+        await storage.markDetectedSubscriptionAsConfirmed(detectedId);
+        createdSubscriptions.push(subscription);
+      }
+
+      res.status(201).json({
+        success: true,
+        created: createdSubscriptions.length,
+        subscriptions: createdSubscriptions,
+      });
+    } catch (error) {
+      logger.error("Error confirming bank statement subscriptions", { error });
+      res.status(500).json({ error: "Failed to create subscriptions" });
+    }
+  });
+
   // ===== Plaid Bank Integration Routes =====
 
   // Create Plaid Link token

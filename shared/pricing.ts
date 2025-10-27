@@ -17,6 +17,7 @@ export interface PlanFeatures {
   webhooks: boolean;
   cancelHelper: boolean;
   emailNotifications: boolean;
+  autoSyncEnabled: boolean; // Auto-sync bank transactions to create subscriptions
 }
 
 export interface PlanDetails {
@@ -40,6 +41,7 @@ export const PLAN_FEATURES: Record<PricingTier, PlanFeatures> = {
     webhooks: false,
     cancelHelper: true,
     emailNotifications: false,
+    autoSyncEnabled: false,
   },
   essentials: {
     maxSubscriptions: 25,
@@ -50,6 +52,7 @@ export const PLAN_FEATURES: Record<PricingTier, PlanFeatures> = {
     webhooks: false,
     cancelHelper: true,
     emailNotifications: true,
+    autoSyncEnabled: false,
   },
   pro: {
     maxSubscriptions: null, // unlimited
@@ -60,6 +63,7 @@ export const PLAN_FEATURES: Record<PricingTier, PlanFeatures> = {
     webhooks: true,
     cancelHelper: true,
     emailNotifications: true,
+    autoSyncEnabled: true, // Premium feature for Pro plan
   },
 };
 
