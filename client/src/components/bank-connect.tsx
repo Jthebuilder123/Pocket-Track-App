@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { usePlaidLink } from "react-plaid-link";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, RefreshCw, Unplug, AlertCircle, LogIn, Lock } from "lucide-react";
+import { Building2, RefreshCw, Unplug, AlertCircle, LogIn, Lock, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,37 @@ import { type BankConnection } from "@shared/schema";
 import { useLocation } from "wouter";
 // CAP: Import Capacitor utilities for native browser handling
 import { isCapacitor, openInSystemBrowser, getReturnUrl, handlePlaidReturn } from "@/lib/capacitorUtils";
+
+// Helper to parse API error responses from apiRequest
+function getErrorMessage(error: any): { message: string; isLimitError: boolean } {
+  try {
+    // apiRequest throws Error with format: "statusCode: jsonBody"
+    const errorMessage = error?.message || "";
+    
+    // Try to extract JSON from error message
+    const jsonMatch = errorMessage.match(/\d+:\s*(\{.+\})/);
+    if (jsonMatch) {
+      const errorData = JSON.parse(jsonMatch[1]);
+      const isLimitError = 
+        errorData.error === "Bank connection limit reached" ||
+        errorData.error === "Subscription limit reached" ||
+        errorData.error === "Upgrade required";
+      
+      return {
+        message: errorData.message || errorData.error || "An error occurred",
+        isLimitError
+      };
+    }
+  } catch {
+    // If parsing fails, return the raw error message
+  }
+  
+  const rawMessage = error?.message || "An unexpected error occurred";
+  return { 
+    message: rawMessage.replace(/^\d+:\s*/, ""), // Remove status code prefix
+    isLimitError: false 
+  };
+}
 
 export function BankConnect() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
@@ -40,11 +71,23 @@ export function BankConnect() {
     onSuccess: (data) => {
       setLinkToken(data.link_token);
     },
-    onError: () => {
+    onError: (error) => {
+      const { message, isLimitError } = getErrorMessage(error);
       toast({
-        title: "Connection Failed",
-        description: "Unable to initialize bank connection",
+        title: isLimitError ? "Plan Limit Reached" : "Connection Failed",
+        description: message,
         variant: "destructive",
+        action: isLimitError ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setLocation("/pricing")}
+            data-testid="button-upgrade-toast"
+          >
+            <Crown className="w-4 h-4 mr-1" />
+            Upgrade
+          </Button>
+        ) : undefined,
       });
     },
   });
@@ -70,11 +113,23 @@ export function BankConnect() {
         description: "Successfully connected your bank account",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      const { message, isLimitError } = getErrorMessage(error);
       toast({
-        title: "Connection Failed",
-        description: "Unable to connect bank account",
+        title: isLimitError ? "Plan Limit Reached" : "Connection Failed",
+        description: message,
         variant: "destructive",
+        action: isLimitError ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setLocation("/pricing")}
+            data-testid="button-upgrade-toast"
+          >
+            <Crown className="w-4 h-4 mr-1" />
+            Upgrade
+          </Button>
+        ) : undefined,
       });
     },
   });
@@ -93,10 +148,11 @@ export function BankConnect() {
         description: "Bank transactions synced successfully",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      const { message } = getErrorMessage(error);
       toast({
         title: "Sync Failed",
-        description: "Unable to sync transactions",
+        description: message,
         variant: "destructive",
       });
     },
@@ -114,10 +170,11 @@ export function BankConnect() {
         description: "Bank account has been disconnected",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      const { message } = getErrorMessage(error);
       toast({
         title: "Disconnect Failed",
-        description: "Unable to disconnect bank account",
+        description: message,
         variant: "destructive",
       });
     },
