@@ -25,7 +25,6 @@ The application features a responsive design built with React and Shadcn UI, sty
     - Visual analytics dashboard.
     - Export and import functionalities (CSV/JSON) gated by plan tier.
     - **Bank Statement Import**: Upload bank statements (PDF/CSV/Excel) to automatically detect recurring transactions and suggest subscriptions for approval. Uses pdf-parse, papaparse, and xlsx libraries with pattern analysis.
-    - **Self-Tracking**: When users subscribe to Essentials or Pro plans, PocketTrack automatically creates a subscription entry in their dashboard to track their own PocketTrack subscription (with actual price, billing cycle, and renewal dates from Stripe).
     - Webhook system for external integrations gated by plan tier.
     - Email notification preferences for renewal reminders.
     - Audit trail for subscription changes.
@@ -35,7 +34,7 @@ The application features a responsive design built with React and Shadcn UI, sty
 - **Native Mobile Apps**: Wrapped as native iOS and Android applications using Capacitor, enabling app store distribution and secure OAuth flows via system browsers (SFSafariViewController/Custom Tabs) and deep linking.
 
 ### System Design Choices
-The system is built with a clear separation of concerns between client and server. Shared types and schemas are centralized. Authentication includes rate limiting and secure session management. Production readiness features include health monitoring (smart root endpoint that serves both health checks and frontend), structured logging, robust error handling, asynchronous template seeding, and environment variable validation for security.
+The system is built with a clear separation of concerns between client and server. Shared types and schemas are centralized. Authentication includes rate limiting and secure session management. Production readiness features include health monitoring, structured logging, robust error handling, and environment variable validation for security.
 
 ## External Dependencies
 - **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection. Requires `PLAID_CLIENT_ID` and `PLAID_SECRET`.
