@@ -98,7 +98,7 @@ export default function Pricing() {
             description: "Your subscription is now active. Enjoy your new features!",
           });
           queryClient.invalidateQueries({ queryKey: ["/api/user/plan"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         },
         () => {
           // CAP: Cancel callback
@@ -121,7 +121,7 @@ export default function Pricing() {
           description: "Your subscription is now active. Enjoy your new features!",
         });
         queryClient.invalidateQueries({ queryKey: ["/api/user/plan"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         navigate("/pricing");
       } else if (params.get("canceled") === "true") {
         toast({
