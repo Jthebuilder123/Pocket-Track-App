@@ -54,13 +54,12 @@ replit.nix
 
 # Capacitor mobile builds
 ios/App/Pods/
-ios/App/public/
+ios/App/App/public/
 android/app/build/
 android/app/release/
 android/app/debug/
 
 # iOS
-ios/App/App/public/assets/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 DerivedData/
