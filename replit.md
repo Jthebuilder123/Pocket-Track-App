@@ -26,7 +26,11 @@ The application features a responsive design built with React and Shadcn UI, sty
     - Export and import functionalities (CSV/JSON) gated by plan tier.
     - **Bank Statement Import**: Upload bank statements (PDF/CSV/Excel) to automatically detect recurring transactions and suggest subscriptions for approval. Uses pdf-parse, papaparse, and xlsx libraries with pattern analysis.
     - Webhook system for external integrations gated by plan tier.
-    - Email notification preferences for renewal reminders.
+    - **Email Notifications**: 
+        - Payment confirmation emails sent via SendGrid when users subscribe to paid plans through Stripe checkout
+        - Magic link authentication emails for email/password login
+        - Configurable with `SENDGRID_API_KEY` environment variable (falls back to console logging in dev)
+        - Email system uses non-throwing sendEmail() function that returns boolean for webhook safety
     - Audit trail for subscription changes.
     - Three-tier pricing system (Free, Essentials, Pro) with feature gates enforcing per-user limits.
     - **Auto-sync Feature Flag**: Premium (Pro) plan includes `autoSyncEnabled` flag for future automatic bank transaction syncing capability.
