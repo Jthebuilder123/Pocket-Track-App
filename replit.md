@@ -40,6 +40,10 @@ The application features a responsive design built with React and Shadcn UI, sty
 ### System Design Choices
 The system is built with a clear separation of concerns between client and server. Shared types and schemas are centralized. Authentication includes rate limiting and secure session management. Production readiness features include health monitoring, structured logging, robust error handling, and environment variable validation for security.
 
+### Recent Fixes (October 2025)
+- **Payment Plan Update Bug Fix**: Resolved issue where users' paid plans displayed as "Free" after successful Stripe checkout. The root cause was a query key mismatch in the cache invalidation logic - the pricing page was invalidating `["/api/auth/me"]` but the `useAuth` hook uses `["/api/auth/user"]`. Fixed by updating the pricing page to invalidate the correct query key, ensuring user plan updates are reflected immediately without requiring a page refresh.
+- **Enhanced Webhook Logging**: Added comprehensive logging to Stripe webhook handler and database update functions to track payment processing, plan updates, and identify issues in production. Logging includes userId, planId, customer IDs, and detailed error messages for debugging.
+
 ## External Dependencies
 - **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection. Requires `PLAID_CLIENT_ID` and `PLAID_SECRET`.
 - **Stripe**: Payment processing for subscription plans with webhook-based plan activation. Requires `STRIPE_SECRET_KEY`. Pricing is defined dynamically in `shared/pricing.ts`.
