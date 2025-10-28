@@ -80,11 +80,23 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
       });
       setCancelReason("");
     },
-    onError: () => {
+    onError: (error: any) => {
+      let errorMessage = "Failed to cancel subscription. Please try again.";
+      
+      if (error?.message?.includes("already cancelled")) {
+        errorMessage = "This subscription has already been cancelled.";
+      } else if (error?.message?.includes("404")) {
+        errorMessage = "Subscription not found.";
+      } else if (error?.message?.includes("403")) {
+        errorMessage = "You don't have permission to cancel this subscription.";
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to cancel subscription. Please try again.",
+        description: errorMessage,
       });
     },
   });

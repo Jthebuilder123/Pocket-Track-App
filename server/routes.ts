@@ -14,7 +14,7 @@ import logger from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { requireAuth, optionalAuth } from "./authMiddleware";
 import { checkSubscriptionLimit, checkBankConnectionLimit, requireFeature, getUserPlanLimits } from "./feature-gates";
-import { PLANS, PRICING_TIERS } from "@shared/pricing";
+import { PLANS, PRICING_TIERS, type PricingTier, isLimitReached, getLimit } from "@shared/pricing";
 import { sendEmail } from "./auth";
 
 
@@ -280,6 +280,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
 
+      // Check if already cancelled
+      if (existing.status === "cancelled") {
+        return res.status(400).json({ 
+          error: "Subscription already cancelled",
+          message: "This subscription has already been cancelled"
+        });
+      }
+
       const result = cancelSubscriptionSchema.safeParse(req.body);
       if (!result.success) {
         const errorMessage = fromZodError(result.error).toString();
@@ -451,6 +459,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (subscriptionsToImport.length === 0) {
         return res.status(400).json({ error: "No subscriptions to import" });
+      }
+
+      // Check subscription limit before importing
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      const userPlan = user.plan as PricingTier;
+      const userSubscriptions = await storage.getSubscriptionsByUserId(user.id);
+      const activeCount = userSubscriptions.filter((s) => s.status === "active").length;
+      const totalAfterImport = activeCount + subscriptionsToImport.length;
+
+      if (isLimitReached(userPlan, "maxSubscriptions", totalAfterImport - 1)) {
+        const limit = getLimit(userPlan, "maxSubscriptions");
+        
+        logger.warn("Import would exceed subscription limit", {
+          userId: user.id,
+          email: user.email,
+          plan: userPlan,
+          currentCount: activeCount,
+          importCount: subscriptionsToImport.length,
+          totalAfterImport,
+          limit,
+        });
+
+        return res.status(403).json({
+          error: "Subscription limit exceeded",
+          message: `Importing ${subscriptionsToImport.length} subscription${subscriptionsToImport.length > 1 ? 's' : ''} would exceed your ${userPlan} plan limit of ${limit}. You currently have ${activeCount} active subscription${activeCount !== 1 ? 's' : ''}. Please upgrade your plan or reduce the number of subscriptions to import.`,
+          currentPlan: userPlan,
+          currentCount: activeCount,
+          importCount: subscriptionsToImport.length,
+          limit,
+        });
       }
 
       // Insert all subscriptions with userId
