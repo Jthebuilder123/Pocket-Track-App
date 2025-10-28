@@ -5,7 +5,7 @@ import logger from "./logger";
 // Environment variables
 const JWT_SECRET = process.env.JWT_SECRET || "development-secret-change-in-production";
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@pockettrack.app";
+const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@pockettrackapp.com";
 const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:5000";
 
 // Initialize SendGrid if API key is available
