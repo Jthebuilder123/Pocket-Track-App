@@ -15,6 +15,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { requireAuth, optionalAuth } from "./authMiddleware";
 import { checkSubscriptionLimit, checkBankConnectionLimit, requireFeature, getUserPlanLimits } from "./feature-gates";
 import { PLANS, PRICING_TIERS } from "@shared/pricing";
+import { sendEmail } from "./auth";
 
 
 // Initialize Stripe
@@ -1147,6 +1148,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 plan: planId,
                 subscriptionId: session.subscription,
               });
+
+              // Send payment confirmation email
+              try {
+                const user = await storage.getUser(userId);
+                if (user?.email) {
+                  const plan = PLANS.find((p) => p.id === planId);
+                  const planName = plan?.name || planId;
+                  
+                  await sendEmail({
+                    to: user.email,
+                    subject: `Welcome to PocketTrack ${planName}!`,
+                    text: `Thank you for subscribing to PocketTrack ${planName}!\n\nYour subscription is now active and you have access to all ${planName} features.\n\nSubscription Details:\n- Plan: ${planName}\n- Subscription ID: ${session.subscription}\n\nIf you have any questions, please don't hesitate to reach out.\n\nBest regards,\nThe PocketTrack Team`,
+                    html: `
+                      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2>Welcome to PocketTrack ${planName}!</h2>
+                        <p>Thank you for subscribing to PocketTrack ${planName}!</p>
+                        <p>Your subscription is now active and you have access to all ${planName} features.</p>
+                        <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                          <h3 style="margin-top: 0;">Subscription Details</h3>
+                          <ul style="list-style: none; padding: 0;">
+                            <li><strong>Plan:</strong> ${planName}</li>
+                            <li><strong>Subscription ID:</strong> ${session.subscription}</li>
+                          </ul>
+                        </div>
+                        <p>If you have any questions, please don't hesitate to reach out.</p>
+                        <p>Best regards,<br>The PocketTrack Team</p>
+                      </div>
+                    `,
+                  });
+                  
+                  logger.info("Payment confirmation email sent", {
+                    userId,
+                    email: user.email,
+                    plan: planId,
+                  });
+                }
+              } catch (emailError) {
+                // Don't fail webhook if email fails
+                logger.error("Failed to send payment confirmation email", {
+                  error: emailError,
+                  userId,
+                });
+              }
             }
             break;
           }

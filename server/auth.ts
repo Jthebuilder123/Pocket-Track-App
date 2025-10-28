@@ -80,6 +80,39 @@ export function verifySessionToken(token: string): SessionPayload | null {
 }
 
 /**
+ * Generic email sending function
+ */
+export async function sendEmail(options: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<void> {
+  if (SENDGRID_API_KEY) {
+    try {
+      await sgMail.send({
+        to: options.to,
+        from: FROM_EMAIL,
+        subject: options.subject,
+        text: options.text,
+        html: options.html,
+      });
+      logger.info("Email sent", { to: options.to, subject: options.subject });
+    } catch (error) {
+      logger.error("Failed to send email", { error, to: options.to, subject: options.subject });
+      throw new Error("Failed to send email");
+    }
+  } else {
+    // Log email to console if SendGrid is not configured
+    logger.info("Email (SendGrid not configured)", {
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+    });
+  }
+}
+
+/**
  * Send magic link via email or log it if SendGrid is not configured
  */
 export async function sendMagicLink(
@@ -89,39 +122,23 @@ export async function sendMagicLink(
 ): Promise<void> {
   const magicLink = `${APP_BASE_URL}/api/auth/magic?token=${token}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
 
-  if (SENDGRID_API_KEY) {
-    try {
-      await sgMail.send({
-        to: email,
-        from: FROM_EMAIL,
-        subject: "Your Magic Link to Sign In",
-        text: `Click this link to sign in: ${magicLink}\n\nThis link expires in 15 minutes.`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Sign In to Your Account</h2>
-            <p>Click the button below to sign in. This link expires in 15 minutes.</p>
-            <a href="${magicLink}" 
-               style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">
-              Sign In
-            </a>
-            <p style="color: #666; font-size: 14px;">
-              Or copy and paste this link into your browser:<br>
-              <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">${magicLink}</code>
-            </p>
-          </div>
-        `,
-      });
-      logger.info("Magic link sent via email", { email });
-    } catch (error) {
-      logger.error("Failed to send magic link email", { error, email });
-      throw new Error("Failed to send email");
-    }
-  } else {
-    // Log magic link to console if SendGrid is not configured
-    logger.info("Magic link (SendGrid not configured)", { 
-      email, 
-      magicLink,
-      message: "Copy this link to sign in"
-    });
-  }
+  await sendEmail({
+    to: email,
+    subject: "Your Magic Link to Sign In",
+    text: `Click this link to sign in: ${magicLink}\n\nThis link expires in 15 minutes.`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Sign In to Your Account</h2>
+        <p>Click the button below to sign in. This link expires in 15 minutes.</p>
+        <a href="${magicLink}" 
+           style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0;">
+          Sign In
+        </a>
+        <p style="color: #666; font-size: 14px;">
+          Or copy and paste this link into your browser:<br>
+          <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px;">${magicLink}</code>
+        </p>
+      </div>
+    `,
+  });
 }
