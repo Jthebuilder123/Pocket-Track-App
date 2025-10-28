@@ -81,13 +81,15 @@ export function verifySessionToken(token: string): SessionPayload | null {
 
 /**
  * Generic email sending function
+ * Returns true if email was sent successfully, false otherwise
+ * Never throws - safe to use in critical paths like webhooks
  */
 export async function sendEmail(options: {
   to: string;
   subject: string;
   text: string;
   html: string;
-}): Promise<void> {
+}): Promise<boolean> {
   if (SENDGRID_API_KEY) {
     try {
       await sgMail.send({
@@ -98,9 +100,10 @@ export async function sendEmail(options: {
         html: options.html,
       });
       logger.info("Email sent", { to: options.to, subject: options.subject });
+      return true;
     } catch (error) {
       logger.error("Failed to send email", { error, to: options.to, subject: options.subject });
-      throw new Error("Failed to send email");
+      return false;
     }
   } else {
     // Log email to console if SendGrid is not configured
@@ -109,6 +112,7 @@ export async function sendEmail(options: {
       subject: options.subject,
       text: options.text,
     });
+    return true; // Consider this a success in dev mode
   }
 }
 
