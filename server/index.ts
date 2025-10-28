@@ -67,6 +67,24 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
+  // Add dedicated root health check handler for deployment health checks
+  // This must be registered BEFORE Vite/static setup to ensure fast responses
+  app.get("/", (_req, res, next) => {
+    // If this is a health check request (typically from deployment infrastructure),
+    // return immediately with 200 OK
+    // Health check requests usually have specific headers or accept types
+    const userAgent = _req.get("user-agent") || "";
+    const accept = _req.get("accept") || "";
+    
+    // If it looks like a health check (no HTML accept or is a monitoring agent)
+    if (!accept.includes("text/html") || userAgent.includes("health") || userAgent.includes("check")) {
+      return res.status(200).send("OK");
+    }
+    
+    // Otherwise, let Vite/static handler serve the app
+    next();
+  });
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
