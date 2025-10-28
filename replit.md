@@ -43,6 +43,7 @@ The system is built with a clear separation of concerns between client and serve
 ### Recent Fixes (October 2025)
 - **Payment Plan Update Bug Fix**: Resolved issue where users' paid plans displayed as "Free" after successful Stripe checkout. The root cause was a query key mismatch in the cache invalidation logic - the pricing page was invalidating `["/api/auth/me"]` but the `useAuth` hook uses `["/api/auth/user"]`. Fixed by updating the pricing page to invalidate the correct query key, ensuring user plan updates are reflected immediately without requiring a page refresh.
 - **Enhanced Webhook Logging**: Added comprehensive logging to Stripe webhook handler and database update functions to track payment processing, plan updates, and identify issues in production. Logging includes userId, planId, customer IDs, and detailed error messages for debugging.
+- **Template Duplication Cache Fix**: Resolved stale cache issue where users saw duplicate subscription templates. Root cause was `staleTime: Infinity` in TanStack Query configuration, which prevented cache invalidation. Fixed by changing global `staleTime` to 5 minutes (300,000ms), allowing periodic refetches while maintaining performance. Users with existing stale cache should perform a hard refresh (Ctrl+Shift+R or Cmd+Shift+R) to clear browser cache.
 
 ## External Dependencies
 - **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection. Requires `PLAID_CLIENT_ID` and `PLAID_SECRET`.
