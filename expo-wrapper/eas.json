@@ -15,19 +15,7 @@
     },
     "production": {
       "autoIncrement": true,
-      "ios": {
-        "submitApple": {
-          "appleId": "your-apple-id@example.com",
-          "ascAppId": "your-app-store-connect-app-id",
-          "appleTeamId": "your-team-id"
-        }
-      },
-      "android": {
-        "submitGoogle": {
-          "serviceAccountKeyPath": "./service-account-key.json",
-          "track": "internal"
-        }
-      }
+      "autoSubmit": true
     }
   },
   "submit": {

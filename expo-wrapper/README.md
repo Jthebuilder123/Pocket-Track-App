@@ -35,12 +35,25 @@ npm install
 const POCKETTRACK_URL = 'https://your-actual-replit-url.replit.app';
 ```
 
-**eas.json** - Update Apple credentials in production build:
+**eas.json** - Update submission credentials (only needed for auto-submit):
 ```json
-"appleId": "your-apple-id@example.com",
-"ascAppId": "your-app-store-connect-app-id",
-"appleTeamId": "your-team-id"
+"submit": {
+  "production": {
+    "ios": {
+      "appleId": "your-apple-id@example.com",
+      "ascAppId": "your-app-store-connect-app-id",
+      "appleTeamId": "your-team-id"
+    },
+    "android": {
+      "serviceAccountKeyPath": "./service-account-key.json"
+    }
+  }
+}
 ```
+
+**For auto-submit to work:**
+- iOS: Update the Apple ID, App Store Connect App ID, and Team ID
+- Android: Create and place `service-account-key.json` in the root directory
 
 ### 3. Add App Icons & Assets
 
