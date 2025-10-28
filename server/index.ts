@@ -139,14 +139,19 @@ process.on('SIGINT', () => {
       });
     });
 
-    // Keep the process alive
-    server.on('error', (error) => {
-      log(`Server error: ${error.message}`);
+    // Keep the process alive by waiting on server lifecycle events
+    // This allows the process to exit on unrecoverable errors
+    await new Promise<void>((resolve, reject) => {
+      server.on('error', (error) => {
+        log(`Server error: ${error.message}`);
+        reject(error);
+      });
+      
+      server.on('close', () => {
+        log('Server closed');
+        resolve();
+      });
     });
-
-    // Prevent the async function from completing
-    // This keeps the Node.js process alive
-    await new Promise(() => {});
     
   } catch (error: any) {
     log(`Failed to start server: ${error.message}`);

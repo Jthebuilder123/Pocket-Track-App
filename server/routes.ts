@@ -83,7 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dbStatus = "connected";
       
       // Check environment variables
-      const envOk = Boolean(process.env.JWT_SECRET && process.env.DATABASE_URL);
+      const envOk = Boolean(process.env.DATABASE_URL);
       
       res.status(200).json({
         status: "ok",
@@ -108,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "degraded",
         timestamp: new Date().toISOString(),
         error: "Database connection failed",
-        env_ok: Boolean(process.env.JWT_SECRET && process.env.DATABASE_URL),
+        env_ok: Boolean(process.env.DATABASE_URL),
         db_ok: false,
       });
     }
