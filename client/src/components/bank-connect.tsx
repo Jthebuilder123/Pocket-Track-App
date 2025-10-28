@@ -10,8 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type BankConnection } from "@shared/schema";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 // CAP: Import Capacitor utilities for native browser handling
 import { isCapacitor, openInSystemBrowser, getReturnUrl, handlePlaidReturn } from "@/lib/capacitorUtils";
+
+// Debug logging flag - set to false to disable verbose console logs in production
+const DEBUG_BANK_CONNECT = import.meta.env.DEV;
 
 // Helper to parse API error responses from apiRequest
 function getErrorMessage(error: any): { message: string; isLimitError: boolean } {
@@ -50,12 +54,12 @@ export function BankConnect() {
   const [, setLocation] = useLocation();
 
   // Check authentication status
-  const { data: user } = useQuery<{ email: string } | null>({
-    queryKey: ["/api/auth/me"],
-    retry: false,
-  });
-
-  const isGuest = !user;
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const isGuest = !isAuthenticated;
+  
+  if (DEBUG_BANK_CONNECT) {
+    console.log("[DEBUG] Auth status:", { isAuthenticated, authLoading, isGuest });
+  }
 
   const { data: connections = [], isLoading } = useQuery<BankConnection[]>({
     queryKey: ["/api/bank-connections"],
@@ -65,14 +69,20 @@ export function BankConnect() {
   // Create link token mutation
   const createLinkTokenMutation = useMutation({
     mutationFn: async () => {
+      if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Creating link token via API...");
       const response = await apiRequest("POST", "/api/plaid/create-link-token");
-      return response.json();
+      const data = await response.json();
+      if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Link token created successfully");
+      return data;
     },
     onSuccess: (data) => {
+      if (DEBUG_BANK_CONNECT) console.log("[DEBUG] onSuccess: Link token received, setting state");
       setLinkToken(data.link_token);
     },
     onError: (error) => {
+      if (DEBUG_BANK_CONNECT) console.error("[DEBUG] onError: Link token creation failed", error);
       const { message, isLimitError } = getErrorMessage(error);
+      if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Parsed error:", { message, isLimitError });
       toast({
         title: isLimitError ? "Plan Limit Reached" : "Connection Failed",
         description: message,
@@ -233,25 +243,48 @@ export function BankConnect() {
   }, [exchangeTokenMutation]);
 
   const handleConnect = () => {
-    // CAP: In Capacitor, open Plaid Link in system browser
-    if (isCapacitor()) {
-      if (!linkToken) {
-        createLinkTokenMutation.mutate();
-        return;
+    try {
+      if (DEBUG_BANK_CONNECT) {
+        console.log("[DEBUG] Connect Bank button clicked");
+        console.log("[DEBUG] isGuest:", isGuest);
+        console.log("[DEBUG] linkToken:", linkToken ? "exists" : "null");
+        console.log("[DEBUG] ready:", ready);
+        console.log("[DEBUG] isPending:", createLinkTokenMutation.isPending);
       }
       
-      // CAP: Construct Plaid Link URL with return URL
-      const returnUrl = getReturnUrl('plaid');
-      const plaidUrl = `https://cdn.plaid.com/link/v2/stable/link.html?token=${linkToken}&redirect_uri=${encodeURIComponent(returnUrl)}`;
-      
-      openInSystemBrowser(plaidUrl);
-    } else {
-      // CAP: Web environment - use normal Plaid Link SDK
-      if (linkToken && ready) {
-        open();
+      // CAP: In Capacitor, open Plaid Link in system browser
+      if (isCapacitor()) {
+        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Running in Capacitor mode");
+        if (!linkToken) {
+          if (DEBUG_BANK_CONNECT) console.log("[DEBUG] No link token, creating one...");
+          createLinkTokenMutation.mutate();
+          return;
+        }
+        
+        // CAP: Construct Plaid Link URL with return URL
+        const returnUrl = getReturnUrl('plaid');
+        const plaidUrl = `https://cdn.plaid.com/link/v2/stable/link.html?token=${linkToken}&redirect_uri=${encodeURIComponent(returnUrl)}`;
+        
+        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Opening Plaid in system browser");
+        openInSystemBrowser(plaidUrl);
       } else {
-        createLinkTokenMutation.mutate();
+        // CAP: Web environment - use normal Plaid Link SDK
+        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Running in web mode");
+        if (linkToken && ready) {
+          if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Link token ready, opening Plaid Link modal");
+          open();
+        } else {
+          if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Creating link token, ready status:", ready);
+          createLinkTokenMutation.mutate();
+        }
       }
+    } catch (error) {
+      console.error("[DEBUG] Error in handleConnect:", error);
+      toast({
+        title: "Connection Error",
+        description: "An unexpected error occurred. Please check the console for details.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -337,7 +370,11 @@ export function BankConnect() {
           data-testid="button-connect-bank"
         >
           <Building2 className="w-4 h-4 mr-2" />
-          {createLinkTokenMutation.isPending ? "Connecting..." : "Connect Bank"}
+          {createLinkTokenMutation.isPending 
+            ? "Connecting..." 
+            : exchangeTokenMutation.isPending 
+            ? "Processing..."
+            : "Connect Bank"}
         </Button>
       </div>
 
