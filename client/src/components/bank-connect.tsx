@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, ApiError } from "@/lib/queryClient";
 import { type BankConnection } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,11 +19,34 @@ const DEBUG_BANK_CONNECT = import.meta.env.DEV;
 
 // Helper to parse API error responses from apiRequest
 function getErrorMessage(error: any): { message: string; isLimitError: boolean } {
+  // Handle ApiError instances (new error format)
+  if (error instanceof ApiError) {
+    try {
+      // Try to parse the error message as JSON
+      const errorData = JSON.parse(error.message);
+      const isLimitError = 
+        errorData.error === "Bank connection limit reached" ||
+        errorData.error === "Subscription limit reached" ||
+        errorData.error === "Upgrade required";
+      
+      return {
+        message: errorData.message || errorData.error || "An error occurred",
+        isLimitError
+      };
+    } catch {
+      // If JSON parsing fails, return the raw message
+      return {
+        message: error.message || "An unexpected error occurred",
+        isLimitError: false
+      };
+    }
+  }
+  
+  // Legacy error format (fallback for non-ApiError errors)
   try {
-    // apiRequest throws Error with format: "statusCode: jsonBody"
     const errorMessage = error?.message || "";
     
-    // Try to extract JSON from error message
+    // Try to extract JSON from error message (old format: "statusCode: jsonBody")
     const jsonMatch = errorMessage.match(/\d+:\s*(\{.+\})/);
     if (jsonMatch) {
       const errorData = JSON.parse(jsonMatch[1]);
@@ -38,12 +61,13 @@ function getErrorMessage(error: any): { message: string; isLimitError: boolean }
       };
     }
   } catch {
-    // If parsing fails, return the raw error message
+    // If parsing fails, continue to fallback
   }
   
+  // Final fallback
   const rawMessage = error?.message || "An unexpected error occurred";
   return { 
-    message: rawMessage.replace(/^\d+:\s*/, ""), // Remove status code prefix
+    message: rawMessage.replace(/^\d+:\s*/, ""), // Remove status code prefix if present
     isLimitError: false 
   };
 }
@@ -230,13 +254,13 @@ export function BankConnect() {
         // CAP: When returning from Plaid in Capacitor, exchange the token
         // CAP: Backend will fetch institution/account details from Plaid API
         if (publicToken) {
-          console.log('CAP: Plaid OAuth successful, exchanging public_token...');
+          if (DEBUG_BANK_CONNECT) console.log('CAP: Plaid OAuth successful, exchanging public_token...');
           exchangeTokenMutation.mutate({
             public_token: publicToken,
             // CAP: Don't pass institution/account details - backend will fetch them
           });
         } else {
-          console.log('CAP: Plaid OAuth canceled or failed');
+          if (DEBUG_BANK_CONNECT) console.log('CAP: Plaid OAuth canceled or failed');
         }
       });
     }
@@ -279,7 +303,7 @@ export function BankConnect() {
         }
       }
     } catch (error) {
-      console.error("[DEBUG] Error in handleConnect:", error);
+      if (DEBUG_BANK_CONNECT) console.error("[DEBUG] Error in handleConnect:", error);
       toast({
         title: "Connection Error",
         description: "An unexpected error occurred. Please check the console for details.",
