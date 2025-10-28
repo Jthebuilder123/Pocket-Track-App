@@ -90,7 +90,7 @@ PLAID_ENV=sandbox # or development, production
 
 # Email Notifications (Optional)
 SENDGRID_API_KEY=your_sendgrid_api_key
-FROM_EMAIL=noreply@pockettrack.app
+FROM_EMAIL=noreply@pockettrackapp.com
 
 # App Configuration
 NODE_ENV=development
@@ -261,7 +261,7 @@ MIT License - see LICENSE file for details
 
 For issues or questions:
 - Create an issue on GitHub
-- Contact support at support@pockettrack.app
+- Contact support at support@pockettrackapp.com
 
 ## Roadmap
 
