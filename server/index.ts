@@ -35,6 +35,24 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
+// Health check middleware for deployment - responds at root path for health checks only
+app.use((req, res, next) => {
+  if (req.path === "/" && req.method === "GET") {
+    const acceptHeader = req.headers.accept || "";
+    const userAgent = req.headers["user-agent"] || "";
+    
+    // If request doesn't want HTML (likely a health check), respond with health status
+    if (!acceptHeader.includes("text/html") || userAgent.includes("HealthChecker")) {
+      return res.status(200).json({ 
+        status: "ok", 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+      });
+    }
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -69,7 +87,12 @@ app.use((req, res, next) => {
   const server = await registerRoutes(app);
 
   // Seed subscription templates on startup
-  await seedSubscriptionTemplates();
+  try {
+    await seedSubscriptionTemplates();
+  } catch (error) {
+    console.error("Failed to seed templates:", error);
+    // Continue startup even if seeding fails
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
