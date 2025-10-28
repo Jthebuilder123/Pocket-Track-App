@@ -12,16 +12,17 @@ import { createLinkToken, exchangePublicToken, getTransactions, getAccounts, get
 import { z } from "zod";
 import logger from "./logger";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { requireAuth, optionalAuth, type AuthRequest } from "./authMiddleware";
+import { requireAuth, optionalAuth } from "./authMiddleware";
 import { checkSubscriptionLimit, checkBankConnectionLimit, requireFeature, getUserPlanLimits } from "./feature-gates";
 import { PLANS, PRICING_TIERS } from "@shared/pricing";
+
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
 }
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-12-18.acacia",
+  apiVersion: "2025-09-30.clover",
 });
 
 // Rate limiter for auth endpoints
@@ -161,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all subscriptions
-  app.get("/api/subscriptions", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/subscriptions", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
       const subscriptions = await storage.getSubscriptionsByUserId(userId);
@@ -173,7 +174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single subscription
-  app.get("/api/subscriptions/:id", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/subscriptions/:id", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
       const subscription = await storage.getSubscription(req.params.id);
@@ -191,7 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new subscription
-  app.post("/api/subscriptions", requireAuth, checkSubscriptionLimit, async (req: AuthRequest, res) => {
+  app.post("/api/subscriptions", requireAuth, checkSubscriptionLimit, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
       const result = insertSubscriptionSchema.safeParse({ ...req.body, userId });
@@ -209,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update subscription
-  app.put("/api/subscriptions/:id", requireAuth, async (req: AuthRequest, res) => {
+  app.put("/api/subscriptions/:id", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -240,7 +241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete subscription
-  app.delete("/api/subscriptions/:id", requireAuth, async (req: AuthRequest, res) => {
+  app.delete("/api/subscriptions/:id", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -265,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cancel subscription
-  app.post("/api/subscriptions/:id/cancel", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/subscriptions/:id/cancel", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -296,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get subscription history
-  app.get("/api/subscriptions/:id/history", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/subscriptions/:id/history", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -340,7 +341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/subscriptions/import/upload - Parse and preview CSV/Excel
-  app.post("/api/subscriptions/import/upload", requireAuth, requireFeature("importData"), upload.single('file'), async (req, res) => {
+  app.post("/api/subscriptions/import/upload", requireAuth, requireFeature("importData"), upload.single('file'), async (req: any, res: any) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -432,7 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/subscriptions/import/confirm - Bulk insert validated subscriptions
-  app.post("/api/subscriptions/import/confirm", requireAuth, requireFeature("importData"), async (req: AuthRequest, res) => {
+  app.post("/api/subscriptions/import/confirm", requireAuth, requireFeature("importData"), async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -493,7 +494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/bank-statements/upload - Parse bank statement and detect subscriptions
-  app.post("/api/bank-statements/upload", requireAuth, statementUpload.single('file'), async (req, res) => {
+  app.post("/api/bank-statements/upload", requireAuth, statementUpload.single('file'), async (req: any, res: any) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -507,7 +508,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (fileType === 'application/pdf') {
         try {
           // Dynamic import for pdf-parse (CommonJS module)
-          const pdfParse = (await import('pdf-parse')).default;
+          const pdfParseModule: any = await import('pdf-parse');
+          const pdfParse = pdfParseModule.default || pdfParseModule;
           const pdfData = await pdfParse(fileBuffer);
           const text = pdfData.text;
           
@@ -589,7 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Detect recurring subscriptions from transactions
-      const detectedSubs = await storage.detectSubscriptionsFromTransactions(transactions);
+      const detectedSubs = await storage.detectSubscriptionsFromTransactions(transactions as any);
       
       res.json({
         totalTransactions: transactions.length,
@@ -602,7 +604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/bank-statements/confirm - Create subscriptions from selected detected ones
-  app.post("/api/bank-statements/confirm", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/bank-statements/confirm", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -664,7 +666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== Plaid Bank Integration Routes =====
 
   // Create Plaid Link token
-  app.post("/api/plaid/create-link-token", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/plaid/create-link-token", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
       const linkToken = await createLinkToken(userId);
@@ -683,7 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Exchange public token for access token and save bank connection
   // CAP: Updated to support both web (with metadata) and Capacitor (fetch metadata server-side)
-  app.post("/api/plaid/exchange-token", requireAuth, checkBankConnectionLimit, async (req: AuthRequest, res) => {
+  app.post("/api/plaid/exchange-token", requireAuth, checkBankConnectionLimit, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -754,7 +756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all bank connections
-  app.get("/api/bank-connections", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/bank-connections", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -767,7 +769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sync transactions and detect subscriptions
-  app.post("/api/bank-connections/:id/sync", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/bank-connections/:id/sync", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -816,7 +818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Confirm detected subscription (convert to real subscription)
-  app.post("/api/detected-subscriptions/:id/confirm", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/detected-subscriptions/:id/confirm", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
       const detected = await storage.getDetectedSubscription(req.params.id);
@@ -867,7 +869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete bank connection
-  app.delete("/api/bank-connections/:id", requireAuth, async (req: AuthRequest, res) => {
+  app.delete("/api/bank-connections/:id", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
@@ -905,7 +907,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create webhook
-  app.post("/api/webhooks", requireAuth, requireFeature("webhooks"), async (req, res) => {
+  app.post("/api/webhooks", requireAuth, requireFeature("webhooks"), async (req: any, res: any) => {
     try {
       const { insertWebhookSchema } = await import("@shared/schema");
       const result = insertWebhookSchema.safeParse(req.body);
@@ -958,7 +960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== Notification Preferences Routes =====
 
   // Get notification preferences
-  app.get("/api/notification-preferences", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/notification-preferences", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
       const prefs = await storage.getNotificationPreferences(userId);
@@ -970,7 +972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update notification preferences
-  app.put("/api/notification-preferences", requireAuth, async (req: AuthRequest, res) => {
+  app.put("/api/notification-preferences", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
       const { insertNotificationPreferencesSchema } = await import("@shared/schema");
@@ -995,7 +997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/user/plan - Get current user's plan and limits
-  app.get("/api/user/plan", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/user/plan", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
       const limits = await getUserPlanLimits(userId);
@@ -1010,7 +1012,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/create-checkout-session - Create Stripe Checkout session
-  app.post("/api/create-checkout-session", requireAuth, async (req: AuthRequest, res) => {
+  app.post("/api/create-checkout-session", requireAuth, async (req: any, res: any) => {
     try {
       const schema = z.object({
         planId: z.enum([PRICING_TIERS.ESSENTIALS, PRICING_TIERS.PRO]),

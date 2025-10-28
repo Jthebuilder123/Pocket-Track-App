@@ -23,7 +23,7 @@ export interface AuthRequest extends Request {
 /**
  * Middleware to protect routes - requires Replit Auth authentication
  */
-export function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+export function requireAuth(req: any, res: any, next: any) {
   if (!req.user || !req.user.claims || !req.user.claims.sub) {
     logger.warn("Unauthorized access attempt", { 
       hasUser: !!req.user, 
@@ -40,7 +40,7 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
 /**
  * Middleware to optionally load user if authenticated
  */
-export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
+export function optionalAuth(req: any, res: any, next: any) {
   // User will be loaded by Passport if session exists
   // No action needed, just pass through
   next();

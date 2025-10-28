@@ -10,7 +10,7 @@ export interface FeatureGateRequest extends AuthRequest {
 
 // Middleware to check if user has access to a specific feature
 export function requireFeature(featureName: string) {
-  return async (req: FeatureGateRequest, res: Response, next: NextFunction) => {
+  return async (req: any, res: any, next: any) => {
     if (!req.user?.claims?.sub) {
       return res.status(401).json({ error: "Authentication required" });
     }
@@ -52,9 +52,9 @@ export function requireFeature(featureName: string) {
 
 // Middleware to check subscription limit
 export async function checkSubscriptionLimit(
-  req: FeatureGateRequest,
-  res: Response,
-  next: NextFunction
+  req: any,
+  res: any,
+  next: any
 ) {
   if (!req.user?.claims?.sub) {
     return res.status(401).json({ error: "Authentication required" });
@@ -101,9 +101,9 @@ export async function checkSubscriptionLimit(
 
 // Middleware to check bank connection limit
 export async function checkBankConnectionLimit(
-  req: FeatureGateRequest,
-  res: Response,
-  next: NextFunction
+  req: any,
+  res: any,
+  next: any
 ) {
   if (!req.user?.claims?.sub) {
     return res.status(401).json({ error: "Authentication required" });
