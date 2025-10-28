@@ -1,5 +1,5 @@
 import { useQuery, useMutation, type UseMutationResult } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, ApiError } from "@/lib/queryClient";
 import { guestStorage, type GuestSubscription } from "@/lib/guestStorage";
 import type { Subscription, InsertSubscriptionClient } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
@@ -89,19 +89,30 @@ export function useDeleteSubscription(): UseMutationResult<void, Error, string> 
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // If clearly a guest, use localStorage
       if (isGuest) {
         const success = guestStorage.deleteSubscription(id);
         if (!success) throw new Error("Subscription not found");
         return;
       }
-      await apiRequest("DELETE", `/api/subscriptions/${id}`);
+      
+      // Try API delete, but fall back to localStorage if 401 (auth race condition)
+      try {
+        await apiRequest("DELETE", `/api/subscriptions/${id}`);
+      } catch (error: any) {
+        if (error instanceof ApiError && error.status === 401) {
+          // User might be a guest (auth query race condition)
+          const success = guestStorage.deleteSubscription(id);
+          if (!success) throw new Error("Subscription not found");
+          return;
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
-      if (isGuest) {
-        queryClient.invalidateQueries({ queryKey: ["guest-subscriptions"] });
-      } else {
-        queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
-      }
+      // Invalidate both to be safe
+      queryClient.invalidateQueries({ queryKey: ["guest-subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
     },
   });
 }

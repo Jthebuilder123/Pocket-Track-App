@@ -9,6 +9,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { type Subscription } from "@shared/schema";
+import { useDeleteSubscription } from "@/hooks/useSubscriptions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,25 +49,29 @@ export function SubscriptionCard({ subscription, onEdit }: SubscriptionCardProps
     subscription.cancellationSteps
   );
 
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("DELETE", `/api/subscriptions/${subscription.id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/subscriptions"] });
-      toast({
-        title: "Subscription deleted",
-        description: `${subscription.name} has been removed from your subscriptions.`,
+  // Use the hook that handles guest mode correctly
+  const deleteSubscriptionMutation = useDeleteSubscription();
+  
+  const deleteMutation = {
+    mutate: () => {
+      deleteSubscriptionMutation.mutate(subscription.id, {
+        onSuccess: () => {
+          toast({
+            title: "Subscription deleted",
+            description: `${subscription.name} has been removed from your subscriptions.`,
+          });
+        },
+        onError: () => {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to delete subscription. Please try again.",
+          });
+        },
       });
     },
-    onError: () => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete subscription. Please try again.",
-      });
-    },
-  });
+    isPending: deleteSubscriptionMutation.isPending,
+  };
 
   const cancelMutation = useMutation({
     mutationFn: async (reason?: string) => {
