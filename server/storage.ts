@@ -3,6 +3,7 @@ import { db } from "./db";
 import { eq, desc, sql as drizzleSql } from "drizzle-orm";
 import type { Transaction } from "plaid";
 import { triggerWebhooks } from "./webhook-service";
+import logger from "./logger";
 
 export interface IStorage {
   // Subscription operations
@@ -430,11 +431,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserPlan(userId: string, plan: string): Promise<User | undefined> {
+    logger.info("DB: Updating user plan", { userId, plan });
+    
+    // First check if user exists
+    const existingUser = await this.getUser(userId);
+    if (!existingUser) {
+      logger.error("DB: User not found when updating plan", { userId, plan });
+      return undefined;
+    }
+    
+    logger.info("DB: User found, proceeding with update", {
+      userId,
+      currentPlan: existingUser.plan,
+      newPlan: plan,
+    });
+    
     const [user] = await db
       .update(users)
       .set({ plan, updatedAt: drizzleSql`now()` })
       .where(eq(users.id, userId))
       .returning();
+    
+    if (user) {
+      logger.info("DB: User plan updated successfully", {
+        userId,
+        oldPlan: existingUser.plan,
+        newPlan: user.plan,
+      });
+    } else {
+      logger.error("DB: Update returned no user", { userId, plan });
+    }
     
     return user || undefined;
   }

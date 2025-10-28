@@ -1134,18 +1134,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const userId = session.metadata?.userId;
             const planId = session.metadata?.planId;
 
-            if (userId && planId && session.customer) {
+            logger.info("Webhook received: checkout.session.completed", {
+              userId,
+              planId,
+              customerId: session.customer,
+              subscriptionId: session.subscription,
+              sessionId: session.id,
+              metadata: session.metadata,
+            });
+
+            if (!userId || !planId) {
+              logger.error("Missing required metadata in checkout session", {
+                hasUserId: !!userId,
+                hasPlanId: !!planId,
+                metadata: session.metadata,
+              });
+              break;
+            }
+
+            if (!session.customer) {
+              logger.error("Missing customer in checkout session", {
+                userId,
+                planId,
+                sessionId: session.id,
+              });
+              break;
+            }
+
+            try {
               // Update user's plan and Stripe info using userId from metadata
-              await storage.updateUserPlan(userId, planId);
+              logger.info("Updating user plan", { userId, planId });
+              const updatedUser = await storage.updateUserPlan(userId, planId);
+              
+              if (!updatedUser) {
+                logger.error("Failed to update user plan - user not found", {
+                  userId,
+                  planId,
+                });
+                break;
+              }
+
+              logger.info("User plan updated successfully", {
+                userId,
+                newPlan: updatedUser.plan,
+                planId,
+              });
+
+              logger.info("Updating user Stripe info", {
+                userId,
+                customerId: session.customer,
+                subscriptionId: session.subscription,
+              });
+              
               await storage.updateUserStripeInfo(
                 userId,
                 session.customer as string,
                 session.subscription as string
               );
               
-              logger.info("User plan activated", {
+              logger.info("User plan activated successfully", {
                 userId,
-                plan: planId,
+                plan: updatedUser.plan,
                 subscriptionId: session.subscription,
               });
 
@@ -1191,6 +1240,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   });
                 }
               }
+            } catch (error) {
+              logger.error("Error updating user plan or Stripe info", {
+                error,
+                userId,
+                planId,
+                customerId: session.customer,
+              });
+              break;
             }
             break;
           }
