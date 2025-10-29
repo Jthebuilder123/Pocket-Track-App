@@ -35,7 +35,7 @@ The application features a responsive design built with React and Shadcn UI, sty
     - Three-tier pricing system (Free, Essentials, Pro) with feature gates enforcing per-user limits.
     - **Auto-sync Feature Flag**: Premium (Pro) plan includes `autoSyncEnabled` flag for future automatic bank transaction syncing capability.
 - **PWA**: Converted to a Progressive Web App with offline support, installability, and standalone mode using a web app manifest and service worker.
-- **Native Mobile Apps**: Wrapped as native iOS and Android applications using Capacitor, enabling app store distribution and secure OAuth flows via system browsers (SFSafariViewController/Custom Tabs) and deep linking.
+- **Native Mobile Apps**: Wrapped as native iOS and Android applications using Expo/React Native (WebView wrapper), enabling app store distribution with EAS Build for automated submission to App Store and Google Play.
 
 ### System Design Choices
 The system is built with a clear separation of concerns between client and server. Shared types and schemas are centralized. Authentication includes rate limiting and secure session management. Production readiness features include health monitoring, structured logging, robust error handling, and environment variable validation for security.

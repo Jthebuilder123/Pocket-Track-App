@@ -8,7 +8,7 @@ PocketTrack helps users take control of their subscription spending with:
 - 📊 Visual analytics dashboard with spending insights by category
 - 🏦 Automatic subscription detection via Plaid bank integration
 - 📱 Progressive Web App (PWA) with offline support
-- 📲 Native iOS and Android apps via Capacitor
+- 📲 Native iOS and Android apps via Expo/React Native
 - 💳 Tiered pricing with Stripe payment processing
 - 📧 Email notifications for renewals and plan updates
 - 📤 Import/Export subscriptions (CSV, JSON, Excel)
@@ -54,8 +54,9 @@ PocketTrack helps users take control of their subscription spending with:
 - **SendGrid** for email notifications
 
 ### Mobile
-- **Capacitor** for native iOS/Android apps
-- App ID: `app.pockettrack.mobile`
+- **Expo/React Native** WebView wrapper for native iOS/Android apps
+- Bundle ID: `com.pockettrack.app`
+- EAS Build for automated app store submission
 
 ## Prerequisites
 
@@ -134,53 +135,23 @@ npm run build
 npm start
 ```
 
-### iOS App
+### Mobile Apps (iOS & Android)
 
-1. **Update production URL in `capacitor.config.ts`:**
-   ```typescript
-   server: {
-     url: 'https://your-production-domain.com'
-   }
-   ```
+The mobile apps are built using Expo/React Native as a WebView wrapper that loads the hosted web application. The mobile app code is maintained in a separate repository for app store submission.
 
-2. **Build and sync to iOS:**
-   ```bash
-   npm run build
-   npx cap sync ios
-   ```
+**See the `pockettrack-mobile/` directory for:**
+- Complete Expo project structure
+- WebView configuration with Plaid/Stripe external link handling
+- EAS Build configuration for automated app store submission
+- Detailed setup and build instructions in `pockettrack-mobile/GITHUB-SETUP.md`
 
-3. **Open in Xcode:**
-   ```bash
-   npx cap open ios
-   ```
-   
-   Or manually open `ios/App/App.xcworkspace` in Xcode
+**Quick Overview:**
+1. The mobile app loads your deployed web app URL in a native WebView
+2. Update `HOSTED_WEB_APP_URL` in the mobile app's `App.js` to point to your production deployment
+3. Build and submit using EAS Build: `eas build --platform ios --auto-submit`
+4. Bundle ID: `com.pockettrack.app`
 
-4. **Configure signing & capabilities:**
-   - Select your team in Signing & Capabilities
-   - Ensure Bundle Identifier is `app.pockettrack.mobile`
-   - Add necessary capabilities (if required)
-
-5. **Build and archive:**
-   - Product → Archive
-   - Follow App Store submission process
-
-### Android App
-
-1. **Build and sync to Android:**
-   ```bash
-   npm run build
-   npx cap sync android
-   ```
-
-2. **Open in Android Studio:**
-   ```bash
-   npx cap open android
-   ```
-
-3. **Configure signing:**
-   - Build → Generate Signed Bundle/APK
-   - Follow Google Play submission process
+For complete mobile build instructions, see `pockettrack-mobile/README.md`
 
 ## Database Schema
 

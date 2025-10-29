@@ -11,8 +11,6 @@ import { apiRequest, queryClient, ApiError } from "@/lib/queryClient";
 import { type BankConnection } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-// CAP: Import Capacitor utilities for native browser handling
-import { isCapacitor, openInSystemBrowser, getReturnUrl, handlePlaidReturn } from "@/lib/capacitorUtils";
 
 // Debug logging flag - set to false to disable verbose console logs in production
 const DEBUG_BANK_CONNECT = import.meta.env.DEV;
@@ -127,7 +125,6 @@ export function BankConnect() {
   });
 
   // Exchange public token mutation
-  // CAP: Make institution/account fields optional for Capacitor OAuth flow
   const exchangeTokenMutation = useMutation({
     mutationFn: async (data: { 
       public_token: string; 
@@ -215,8 +212,6 @@ export function BankConnect() {
   });
 
   const onSuccess = useCallback((publicToken: string, metadata: any) => {
-    // CAP: Only include institution/account metadata if available from Plaid
-    // CAP: If missing, backend will fetch from Plaid API
     const payload: {
       public_token: string;
       institution_id?: string;
@@ -247,25 +242,6 @@ export function BankConnect() {
 
   const { open, ready } = usePlaidLink(config);
 
-  // CAP: Set up Plaid return handler for Capacitor
-  useEffect(() => {
-    if (isCapacitor()) {
-      handlePlaidReturn((publicToken) => {
-        // CAP: When returning from Plaid in Capacitor, exchange the token
-        // CAP: Backend will fetch institution/account details from Plaid API
-        if (publicToken) {
-          if (DEBUG_BANK_CONNECT) console.log('CAP: Plaid OAuth successful, exchanging public_token...');
-          exchangeTokenMutation.mutate({
-            public_token: publicToken,
-            // CAP: Don't pass institution/account details - backend will fetch them
-          });
-        } else {
-          if (DEBUG_BANK_CONNECT) console.log('CAP: Plaid OAuth canceled or failed');
-        }
-      });
-    }
-  }, [exchangeTokenMutation]);
-
   const handleConnect = () => {
     try {
       if (DEBUG_BANK_CONNECT) {
@@ -276,31 +252,12 @@ export function BankConnect() {
         console.log("[DEBUG] isPending:", createLinkTokenMutation.isPending);
       }
       
-      // CAP: In Capacitor, open Plaid Link in system browser
-      if (isCapacitor()) {
-        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Running in Capacitor mode");
-        if (!linkToken) {
-          if (DEBUG_BANK_CONNECT) console.log("[DEBUG] No link token, creating one...");
-          createLinkTokenMutation.mutate();
-          return;
-        }
-        
-        // CAP: Construct Plaid Link URL with return URL
-        const returnUrl = getReturnUrl('plaid');
-        const plaidUrl = `https://cdn.plaid.com/link/v2/stable/link.html?token=${linkToken}&redirect_uri=${encodeURIComponent(returnUrl)}`;
-        
-        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Opening Plaid in system browser");
-        openInSystemBrowser(plaidUrl);
+      if (linkToken && ready) {
+        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Link token ready, opening Plaid Link modal");
+        open();
       } else {
-        // CAP: Web environment - use normal Plaid Link SDK
-        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Running in web mode");
-        if (linkToken && ready) {
-          if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Link token ready, opening Plaid Link modal");
-          open();
-        } else {
-          if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Creating link token, ready status:", ready);
-          createLinkTokenMutation.mutate();
-        }
+        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Creating link token, ready status:", ready);
+        createLinkTokenMutation.mutate();
       }
     } catch (error) {
       if (DEBUG_BANK_CONNECT) console.error("[DEBUG] Error in handleConnect:", error);
@@ -312,8 +269,8 @@ export function BankConnect() {
     }
   };
 
-  // CAP: Auto-open Plaid Link when token is ready (web only)
-  if (!isCapacitor() && linkToken && ready && !createLinkTokenMutation.isPending) {
+  // Auto-open Plaid Link when token is ready
+  if (linkToken && ready && !createLinkTokenMutation.isPending) {
     open();
   }
 

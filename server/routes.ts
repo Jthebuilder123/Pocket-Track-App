@@ -727,12 +727,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Exchange public token for access token and save bank connection
-  // CAP: Updated to support both web (with metadata) and Capacitor (fetch metadata server-side)
   app.post("/api/plaid/exchange-token", requireAuth, checkBankConnectionLimit, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
 
-      // CAP: Make institution/account details optional for Capacitor OAuth flow
+      // Make institution/account details optional - backend fetches if not provided
       const schema = z.object({
         public_token: z.string(),
         institution_id: z.string().optional(),
@@ -753,7 +752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Exchange public token for access token
       const { accessToken, itemId } = await exchangePublicToken(public_token);
       
-      // CAP: If institution details not provided, fetch from Plaid API
+      // If institution details not provided, fetch from Plaid API
       let finalInstitutionId = institution_id;
       let finalInstitutionName = institution_name;
       let finalAccounts = accounts;
