@@ -1,0 +1,16 @@
+> bun expo prebuild --no-install --platform ios
+PluginError: Failed to resolve plugin for module "expo-build-properties" relative to "/Users/expo/workingdir/build/pockettrack-mobile"
+PluginError: Failed to resolve plugin for module "expo-build-properties" relative to "/Users/expo/workingdir/build/pockettrack-mobile"
+    at resolvePluginForModule (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config-plugins/build/utils/plugin-resolver.js:96:9)
+    at resolveConfigPluginFunctionWithInfo (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config-plugins/build/utils/plugin-resolver.js:145:7)
+    at resolveConfigPluginFunction (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config-plugins/build/utils/plugin-resolver.js:136:7)
+    at withStaticPlugin (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config-plugins/build/plugins/withStaticPlugin.js:85:70)
+    at /Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config-plugins/build/plugins/withPlugins.js:30:84
+    at Array.reduce (<anonymous>)
+    at withPlugins (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config-plugins/build/plugins/withPlugins.js:30:18)
+    at withConfigPlugins (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config/build/plugins/withConfigPlugins.js:35:47)
+    at fillAndReturnConfig (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config/build/Config.js:236:78)
+    at getConfig (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config/build/Config.js:293:10)
+error: "expo" exited with code 1
+[31mError: bun expo prebuild --no-install --platform ios exited with non-zero code: 1[39m
+/bin/bash --login -eo pipefail /var/folders/m1/8_w9962s3b79dqm00nnlm85m0000gn/T/eas-build/51ba19e2-d104-45a5-b95f-8c7b91098c6c/steps/187571a4-dc43-4bf8-a428-b5308a744dc6/scripts/b9305a54-6a01-4310-81ee-b105fc32bb2a.sh exited with non-zero code: 1
