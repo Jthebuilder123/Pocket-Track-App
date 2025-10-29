@@ -1,0 +1,93 @@
+═══════════════════════════════════════════════════════════════════════
+  HOW TO UPLOAD THESE FILES TO YOUR GITHUB REPOSITORY
+═══════════════════════════════════════════════════════════════════════
+
+All the files in this "ready-for-github" folder are ready to be uploaded
+directly to the ROOT of your GitHub repository!
+
+STEP 1: Clean Your GitHub Repository
+────────────────────────────────────────────────────────────────────────
+Go to: https://github.com/Jthebuilder123/Pocket-Track-App
+
+Delete these folders if they exist:
+  ✗ pockettrack-mobile/
+  ✗ MOBILE-APP-FOR-GITHUB/
+
+How to delete:
+  1. Click on the folder name
+  2. Click the trash icon or click "..." menu → "Delete directory"
+  3. Commit the deletion
+
+
+STEP 2: Upload All Files in This Folder
+────────────────────────────────────────────────────────────────────────
+Go back to: https://github.com/Jthebuilder123/Pocket-Track-App
+
+You should now see an empty or mostly empty repo.
+
+  1. Click "Add file" → "Upload files"
+  
+  2. In Replit, select ALL files in the "ready-for-github" folder:
+     ✓ App.js
+     ✓ package.json
+     ✓ app.json
+     ✓ eas.json
+     ✓ README.md
+     ✓ GITHUB-SETUP.md
+     ✓ assets (entire folder with all images inside)
+     ✓ SIMPLE-GITHUB-UPLOAD-GUIDE.txt (optional)
+  
+  3. Download all these files by:
+     - Right-clicking each file individually and selecting "Download"
+     - OR download the entire ready-for-github folder
+  
+  4. On GitHub's upload page, drag all the downloaded files directly
+     onto the upload area
+  
+  5. Commit with message: "Add mobile app files to root"
+
+
+STEP 3: Verify Structure on GitHub
+────────────────────────────────────────────────────────────────────────
+After uploading, your GitHub repository should look like:
+
+Pocket-Track-App/               ← Root of repository
+├── App.js                      ← At root! ✓
+├── package.json                ← At root! ✓
+├── app.json                    ← At root! ✓
+├── eas.json                    ← At root! ✓
+├── README.md                   
+├── GITHUB-SETUP.md            
+└── assets/                     ← At root! ✓
+    ├── icon.png
+    ├── splash.png
+    ├── adaptive-icon.png
+    └── favicon.png
+
+When you click on App.js, the path should show:
+  ✓ CORRECT: Pocket-Track-App / App.js
+  ✗ WRONG: Pocket-Track-App / some-folder / App.js
+
+
+STEP 4: Build and Deploy Your Mobile App
+────────────────────────────────────────────────────────────────────────
+Now you're ready to rebuild your iOS app!
+
+On your computer:
+  1. Open Terminal
+  2. Navigate to your repo: cd Pocket-Track-App
+  3. Pull latest changes: git pull
+  4. Build the app: eas build --platform ios
+  5. Wait 10-20 minutes for build to complete
+  6. Check TestFlight for the new build
+  7. Install and open the app
+
+Result: Your app should now load PocketTrack (https://pocket-track-mvp.replit.app/)
+        instead of showing "Not Found"!
+
+═══════════════════════════════════════════════════════════════════════
+Key Points:
+  • Your POCKETTRACK_URL is already set correctly in App.js
+  • Make sure files are at ROOT level, not in any subfolder
+  • All 4 app icons are included in the assets folder
+═══════════════════════════════════════════════════════════════════════
