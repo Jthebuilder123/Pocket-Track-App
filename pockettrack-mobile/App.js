@@ -5,7 +5,7 @@ import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 
 // TODO: Replace with your actual PocketTrack URL
-const POCKETTRACK_URL = 'https://your-replit-url.replit.app';
+const POCKETTRACK_URL = 'https://pocket-track-mvp.replit.app/';
 
 export default function App() {
   const webViewRef = useRef(null);
