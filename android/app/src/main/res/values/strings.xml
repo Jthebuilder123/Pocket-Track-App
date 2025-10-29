@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">PocketTrack</string>
-    <string name="title_activity_main">PocketTrack</string>
-    <string name="package_name">app.pockettrack.mobile</string>
-    <string name="custom_url_scheme">app.pockettrack.mobile</string>
-</resources>
