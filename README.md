@@ -1,244 +1,252 @@
-# PocketTrack - Subscription Management Tracker
+# PocketTrack Expo Wrapper
 
-A modern web and mobile application for tracking and managing recurring subscriptions with automatic bank integration, visual analytics, and intelligent renewal reminders.
+A minimal Expo React Native wrapper that loads your hosted PocketTrack web app in a WebView with intelligent external link handling.
 
-## Overview
+## Features
 
-PocketTrack helps users take control of their subscription spending with:
-- 📊 Visual analytics dashboard with spending insights by category
-- 🏦 Automatic subscription detection via Plaid bank integration
-- 📱 Progressive Web App (PWA) with offline support
-- 📲 Native iOS and Android apps via Expo/React Native
-- 💳 Tiered pricing with Stripe payment processing
-- 📧 Email notifications for renewals and plan updates
-- 📤 Import/Export subscriptions (CSV, JSON, Excel)
-- 🔔 Cancellation assistance with step-by-step guides
-
-## Features by Plan
-
-### Free Plan
-- Track up to 10 subscriptions
-- Basic analytics dashboard
-- Manual subscription entry
-- Renewal reminders
-
-### Essentials Plan ($4.99/month)
-- Unlimited subscriptions
-- Bank statement import (PDF, CSV, Excel)
-- Export data (CSV, JSON)
-- Priority email support
-
-### Pro Plan ($9.99/month)
-- Everything in Essentials
-- Plaid bank integration for auto-sync
-- Webhook API access
-- Advanced analytics
-- Custom categories
-
-## Tech Stack
-
-### Frontend
-- **React 18** with TypeScript
-- **Wouter** for client-side routing
-- **TanStack Query** for state management
-- **React Hook Form + Zod** for form validation
-- **Shadcn UI + Tailwind CSS** for styling
-- **Recharts** for data visualization
-
-### Backend
-- **Express.js** with TypeScript
-- **PostgreSQL** database with Drizzle ORM
-- **Passport.js** for authentication (Replit Auth/OIDC)
-- **Stripe** for payment processing
-- **Plaid** for bank integration
-- **SendGrid** for email notifications
-
-### Mobile
-- **Expo/React Native** WebView wrapper for native iOS/Android apps
-- Bundle ID: `com.pockettrack.app`
-- EAS Build for automated app store submission
+✅ Loads your hosted PocketTrack site in a native WebView  
+✅ Automatically opens Plaid and Stripe links in system browser  
+✅ Keeps internal navigation within the app  
+✅ Ready for App Store and Google Play submission  
+✅ Configured for EAS Build with auto-submit
 
 ## Prerequisites
 
-- Node.js 18+ 
-- PostgreSQL database
-- Apple Developer Account (for iOS builds)
-- Google Play Developer Account (for Android builds)
+- Node.js 18+ installed
+- Expo account (free): https://expo.dev/signup
+- Apple Developer Account ($99/year) for iOS
+- Google Play Developer Account ($25 one-time) for Android
 
-## Environment Variables
+## Quick Start
 
-Create a `.env` file in the root directory with the following variables:
+### 1. Install Dependencies
 
 ```bash
-# Database
-DATABASE_URL=postgresql://user:password@host:port/database
-
-# Authentication (Replit Auth/OIDC)
-ISSUER_URL=your_oidc_issuer_url
-CLIENT_ID=your_client_id
-CLIENT_SECRET=your_client_secret
-SESSION_SECRET=your_session_secret
-
-# Stripe Payment Processing
-STRIPE_SECRET_KEY=sk_test_xxx
-VITE_STRIPE_PUBLIC_KEY=pk_test_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
-
-# Plaid Bank Integration
-PLAID_CLIENT_ID=your_plaid_client_id
-PLAID_SECRET=your_plaid_secret
-PLAID_ENV=sandbox # or development, production
-
-# Email Notifications (Optional)
-SENDGRID_API_KEY=your_sendgrid_api_key
-FROM_EMAIL=noreply@pockettrackapp.com
-
-# App Configuration
-NODE_ENV=development
-PORT=5000
+cd pockettrack-mobile
+npm install
 ```
 
-## Installation
+### 2. Update Configuration
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/yourusername/pockettrack.git
-   cd pockettrack
-   ```
+**Important:** Before building, update these files:
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+**App.js** - Line 8:
+```javascript
+const POCKETTRACK_URL = 'https://your-actual-replit-url.replit.app';
+```
 
-3. **Set up the database:**
-   ```bash
-   npm run db:push
-   ```
+**eas.json** - Update submission credentials (only needed for auto-submit):
+```json
+"submit": {
+  "production": {
+    "ios": {
+      "appleId": "your-apple-id@example.com",
+      "ascAppId": "your-app-store-connect-app-id",
+      "appleTeamId": "your-team-id"
+    },
+    "android": {
+      "serviceAccountKeyPath": "./service-account-key.json"
+    }
+  }
+}
+```
 
-4. **Start the development server:**
-   ```bash
-   npm run dev
-   ```
+**For auto-submit to work:**
+- iOS: Update the Apple ID, App Store Connect App ID, and Team ID
+- Android: Create and place `service-account-key.json` in the root directory
 
-   The app will be available at `http://localhost:5000`
+### 3. Add App Icons & Assets
+
+Create the following images in the `assets/` folder:
+
+- **icon.png** - 1024x1024px (app icon)
+- **adaptive-icon.png** - 1024x1024px (Android adaptive icon)
+- **splash.png** - 2732x2732px (launch screen)
+
+See `assets/README-ASSETS.txt` for detailed requirements.
+
+### 4. Test Locally
+
+```bash
+# Start Expo development server
+npm start
+
+# Run on iOS simulator (Mac only)
+npm run ios
+
+# Run on Android emulator
+npm run android
+```
+
+Scan the QR code with Expo Go app on your phone for quick testing.
 
 ## Building for Production
 
-### Web Application
+### Install EAS CLI
 
 ```bash
-# Build the web app
-npm run build
-
-# Start production server
-npm start
+npm install -g eas-cli
+eas login
 ```
 
-### Mobile Apps (iOS & Android)
+### Configure EAS Project
 
-The mobile apps are built using Expo/React Native as a WebView wrapper that loads the hosted web application. The mobile app code is maintained in a separate repository for app store submission.
+```bash
+# Link to your Expo account
+eas init
 
-**See the `pockettrack-mobile/` directory for:**
-- Complete Expo project structure
-- WebView configuration with Plaid/Stripe external link handling
-- EAS Build configuration for automated app store submission
-- Detailed setup and build instructions in `pockettrack-mobile/GITHUB-SETUP.md`
+# Configure your build
+eas build:configure
+```
 
-**Quick Overview:**
-1. The mobile app loads your deployed web app URL in a native WebView
-2. Update `HOSTED_WEB_APP_URL` in the mobile app's `App.js` to point to your production deployment
-3. Build and submit using EAS Build: `eas build --platform ios --auto-submit`
-4. Bundle ID: `com.pockettrack.app`
+### Build for iOS
 
-For complete mobile build instructions, see `pockettrack-mobile/README.md`
+```bash
+# Build and submit to App Store automatically
+eas build -p ios --auto-submit
 
-## Database Schema
+# Or build only (manual submission)
+eas build -p ios
+```
 
-The application uses PostgreSQL with the following main tables:
+**First time setup:**
+1. EAS will prompt for your Apple credentials
+2. It will automatically generate signing certificates
+3. Choose "production" build profile
+4. Wait 15-20 minutes for build to complete
 
-- **users** - User accounts with authentication and plan information
-- **subscriptions** - Subscription tracking with renewal dates, costs, and categories
-- **audit_logs** - Change history for subscriptions
-- **webhooks** - Webhook configurations for Pro plan users
-- **plaid_items** - Bank account connections via Plaid
+### Build for Android
 
-See `shared/schema.ts` for complete schema definitions.
+```bash
+# Build and submit to Google Play automatically
+eas build -p android --auto-submit
 
-## API Endpoints
+# Or build only (manual submission)
+eas build -p android
+```
 
-### Authentication
-- `GET /api/auth/login` - Initiate OIDC login
-- `GET /api/auth/callback` - OIDC callback handler
-- `GET /api/auth/user` - Get current user
-- `POST /api/auth/logout` - Logout
+## Configuration Files
 
-### Subscriptions
-- `GET /api/subscriptions` - List all subscriptions
-- `POST /api/subscriptions` - Create subscription
-- `PATCH /api/subscriptions/:id` - Update subscription
-- `DELETE /api/subscriptions/:id` - Delete subscription
-- `POST /api/subscriptions/:id/cancel` - Mark as cancelled
+### package.json
+- Defines dependencies and npm scripts
+- Uses Expo SDK 52 (latest stable)
 
-### Analytics
-- `GET /api/analytics/summary` - Get spending summary
-- `GET /api/analytics/category` - Category breakdown
-- `GET /api/analytics/timeline` - Upcoming renewals
+### app.json
+- App metadata (name, slug, bundle ID)
+- Platform-specific settings
+- Icon and splash screen configuration
 
-### Import/Export
-- `POST /api/subscriptions/export` - Export data (CSV/JSON)
-- `POST /api/subscriptions/import/analyze` - Analyze import file
-- `POST /api/subscriptions/import/confirm` - Confirm import
+### eas.json
+- EAS Build configuration
+- Auto-submit settings for App Store & Google Play
+- Build profiles (development, preview, production)
 
-### Plaid Integration (Pro Plan)
-- `POST /api/plaid/link-token` - Create Plaid Link token
-- `POST /api/plaid/exchange-token` - Exchange public token
-- `GET /api/plaid/accounts` - List connected accounts
-- `POST /api/plaid/sync` - Sync transactions
+### App.js
+- Main application component
+- WebView setup with external link handling
+- Opens Plaid/Stripe links in system browser
 
-### Payments
-- `POST /api/stripe/checkout` - Create checkout session
-- `POST /api/webhooks/stripe` - Stripe webhook handler
+## External Link Handling
 
-## Security Notes
+The app automatically opens these links in the system browser:
 
-- Never commit `.env` files or secrets to Git
-- Use Replit Secrets or environment variables for sensitive data
-- All API keys are stored securely and never exposed to the client
-- Webhook endpoints use signature verification
-- Rate limiting is enabled on authentication endpoints
-- Sessions are stored securely in PostgreSQL with encrypted cookies
+- **Plaid**: Any URL containing `plaid.com`
+- **Stripe**: URLs with `checkout.stripe.com` or `/billing/checkout`
 
-## PWA Features
+To add more external domains, edit `shouldOpenExternally()` in `App.js`:
 
-- Offline support with service worker
-- Installable on mobile and desktop
-- Standalone app mode
-- App manifest with icons and theme colors
+```javascript
+const shouldOpenExternally = (url) => {
+  if (url.includes('plaid.com')) return true;
+  if (url.includes('checkout.stripe.com')) return true;
+  if (url.includes('/billing/checkout')) return true;
+  
+  // Add your custom domains here
+  if (url.includes('example.com')) return true;
+  
+  return false;
+};
+```
 
-## Contributing
+## App Store Submission Checklist
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+### iOS App Store
 
-## License
+1. ✅ Apple Developer Account active
+2. ✅ App icons created (1024x1024)
+3. ✅ Bundle ID configured: `com.pockettrack.app`
+4. ✅ Privacy policy URL ready
+5. ✅ App Store screenshots prepared
+6. ✅ App description written
+7. ✅ Update `eas.json` with Apple credentials
+8. ✅ Run `eas build -p ios --auto-submit`
 
-MIT License - see LICENSE file for details
+### Google Play Store
+
+1. ✅ Google Play Developer account active
+2. ✅ App icons created (512x512 + 1024x1024)
+3. ✅ Package name: `com.pockettrack.app`
+4. ✅ Privacy policy URL ready
+5. ✅ Play Store screenshots prepared
+6. ✅ Feature graphic (1024x500) created
+7. ✅ Update `eas.json` with service account key
+8. ✅ Run `eas build -p android --auto-submit`
+
+## Testing External Links
+
+To test Plaid/Stripe link handling:
+
+1. Run the app: `npm start`
+2. Navigate to a page with Plaid or Stripe links
+3. Click a link - it should open in Safari/Chrome (not WebView)
+4. Verify you can complete the flow and return to the app
+
+## Troubleshooting
+
+### Build Fails
+
+```bash
+# Clear cache and rebuild
+eas build -p ios --clear-cache
+```
+
+### WebView Not Loading
+
+Check that `POCKETTRACK_URL` in `App.js` is correct and accessible.
+
+### External Links Not Opening
+
+Verify the domain is listed in `shouldOpenExternally()` function.
+
+### Icons Missing
+
+Make sure all required assets are in the `assets/` folder with exact names.
+
+## Updates & Maintenance
+
+### Update the Web App URL
+
+Edit `App.js` line 8 to point to your new deployment URL.
+
+### Over-the-Air Updates
+
+Expo supports OTA updates for JavaScript changes:
+
+```bash
+eas update --branch production
+```
+
+This updates the app without resubmitting to stores.
 
 ## Support
 
-For issues or questions:
-- Create an issue on GitHub
-- Contact support at support@pockettrackapp.com
+For Expo-specific issues:
+- Expo Docs: https://docs.expo.dev/
+- Expo Forums: https://forums.expo.dev/
 
-## Roadmap
+For PocketTrack issues:
+- GitHub: https://github.com/yourusername/pockettrack
 
-- [ ] Automated renewal reminders via email/SMS
-- [ ] Subscription sharing with family members
-- [ ] Bill negotiation assistance
-- [ ] Integration with more financial institutions
-- [ ] Receipt scanning and storage
-- [ ] Budget forecasting and recommendations
+## License
+
+Same as main PocketTrack project (MIT)
