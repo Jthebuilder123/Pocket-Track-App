@@ -633,8 +633,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No transactions found in the statement" });
       }
 
+      const userId = req.user!.claims.sub;
       // Detect recurring subscriptions from transactions
-      const detectedSubs = await storage.detectSubscriptionsFromTransactions(transactions as any);
+      const detectedSubs = await storage.detectSubscriptionsFromTransactions(userId, transactions as any);
       
       res.json({
         totalTransactions: transactions.length,
@@ -669,7 +670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create subscriptions from detected ones
       const createdSubscriptions = [];
       for (const detectedId of subscriptionIds) {
-        const detected = await storage.getDetectedSubscription(detectedId);
+        const detected = await storage.getDetectedSubscription(detectedId, userId);
         if (!detected) continue;
 
         const nextRenewal = new Date();
@@ -691,7 +692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes: `Imported from bank statement (${detected.confidence}% confidence)`,
         });
 
-        await storage.markDetectedSubscriptionAsConfirmed(detectedId);
+        await storage.markDetectedSubscriptionAsConfirmed(detectedId, userId);
         createdSubscriptions.push(subscription);
       }
 
@@ -833,7 +834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate.toISOString().split('T')[0]
       );
 
-      const detectedSubs = await storage.detectSubscriptionsFromTransactions(txnData.transactions);
+      const detectedSubs = await storage.detectSubscriptionsFromTransactions(userId, txnData.transactions);
       
       await storage.updateBankConnectionSyncTime(req.params.id);
       
@@ -849,9 +850,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get detected subscriptions
-  app.get("/api/detected-subscriptions", async (_req, res) => {
+  app.get("/api/detected-subscriptions", requireAuth, async (req: any, res: any) => {
     try {
-      const detected = await storage.getDetectedSubscriptions();
+      const userId = req.user!.claims.sub;
+      const detected = await storage.getDetectedSubscriptionsByUserId(userId);
       res.json(detected);
     } catch (error) {
       logger.error("Error fetching detected subscriptions", { error });
@@ -863,7 +865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/detected-subscriptions/:id/confirm", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
-      const detected = await storage.getDetectedSubscription(req.params.id);
+      const detected = await storage.getDetectedSubscription(req.params.id, userId);
       if (!detected) {
         return res.status(404).json({ error: "Detected subscription not found" });
       }
@@ -887,7 +889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: `Auto-detected from bank transactions (${detected.confidence}% confidence)`,
       });
 
-      await storage.markDetectedSubscriptionAsConfirmed(req.params.id);
+      await storage.markDetectedSubscriptionAsConfirmed(req.params.id, userId);
       
       res.json(subscription);
     } catch (error) {
@@ -897,9 +899,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dismiss detected subscription
-  app.delete("/api/detected-subscriptions/:id", async (req, res) => {
+  app.delete("/api/detected-subscriptions/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const deleted = await storage.deleteDetectedSubscription(req.params.id);
+      const userId = req.user!.claims.sub;
+      const deleted = await storage.deleteDetectedSubscription(req.params.id, userId);
       if (!deleted) {
         return res.status(404).json({ error: "Detected subscription not found" });
       }

@@ -120,6 +120,7 @@ export type BankConnection = typeof bankConnections.$inferSelect;
 // Detected subscriptions (pending user confirmation)
 export const detectedSubscriptions = pgTable("detected_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
   merchantName: text("merchant_name").notNull(),
   estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }).notNull(),
   detectedBillingCycle: text("detected_billing_cycle").notNull(),

@@ -28,11 +28,11 @@ export interface IStorage {
   updateBankConnectionSyncTime(id: string): Promise<void>;
   
   // Detected subscriptions operations
-  getDetectedSubscriptions(): Promise<DetectedSubscription[]>;
-  getDetectedSubscription(id: string): Promise<DetectedSubscription | undefined>;
-  detectSubscriptionsFromTransactions(transactions: Transaction[]): Promise<DetectedSubscription[]>;
-  markDetectedSubscriptionAsConfirmed(id: string): Promise<void>;
-  deleteDetectedSubscription(id: string): Promise<boolean>;
+  getDetectedSubscriptionsByUserId(userId: string): Promise<DetectedSubscription[]>;
+  getDetectedSubscription(id: string, userId?: string): Promise<DetectedSubscription | undefined>;
+  detectSubscriptionsFromTransactions(userId: string, transactions: Transaction[]): Promise<DetectedSubscription[]>;
+  markDetectedSubscriptionAsConfirmed(id: string, userId?: string): Promise<void>;
+  deleteDetectedSubscription(id: string, userId?: string): Promise<boolean>;
   
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -258,16 +258,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Detected subscriptions methods
-  async getDetectedSubscriptions(): Promise<DetectedSubscription[]> {
-    return await db.select().from(detectedSubscriptions).where(eq(detectedSubscriptions.status, "pending"));
+  async getDetectedSubscriptionsByUserId(userId: string): Promise<DetectedSubscription[]> {
+    return await db.select().from(detectedSubscriptions).where(
+      drizzleSql`${detectedSubscriptions.userId} = ${userId} AND ${detectedSubscriptions.status} = 'pending'`
+    );
   }
 
-  async getDetectedSubscription(id: string): Promise<DetectedSubscription | undefined> {
+  async getDetectedSubscription(id: string, userId?: string): Promise<DetectedSubscription | undefined> {
     const [detected] = await db.select().from(detectedSubscriptions).where(eq(detectedSubscriptions.id, id));
+    if (detected && userId && detected.userId !== userId) {
+      return undefined; // Don't return if userId doesn't match (access control)
+    }
     return detected || undefined;
   }
 
-  async detectSubscriptionsFromTransactions(transactions: Transaction[]): Promise<DetectedSubscription[]> {
+  async detectSubscriptionsFromTransactions(userId: string, transactions: Transaction[]): Promise<DetectedSubscription[]> {
     const merchantGroups = new Map<string, Transaction[]>();
     
     for (const txn of transactions) {
@@ -319,6 +324,7 @@ export class DatabaseStorage implements IStorage {
       const [detectedSub] = await db
         .insert(detectedSubscriptions)
         .values({
+          userId,
           merchantName,
           estimatedCost: avgCost.toFixed(2),
           detectedBillingCycle: billingCycle,
@@ -360,16 +366,30 @@ export class DatabaseStorage implements IStorage {
     return "Other";
   }
 
-  async markDetectedSubscriptionAsConfirmed(id: string): Promise<void> {
-    await db
-      .update(detectedSubscriptions)
-      .set({ status: "confirmed" })
-      .where(eq(detectedSubscriptions.id, id));
+  async markDetectedSubscriptionAsConfirmed(id: string, userId?: string): Promise<void> {
+    if (userId) {
+      await db
+        .update(detectedSubscriptions)
+        .set({ status: "confirmed" })
+        .where(drizzleSql`${detectedSubscriptions.id} = ${id} AND ${detectedSubscriptions.userId} = ${userId}`);
+    } else {
+      await db
+        .update(detectedSubscriptions)
+        .set({ status: "confirmed" })
+        .where(eq(detectedSubscriptions.id, id));
+    }
   }
 
-  async deleteDetectedSubscription(id: string): Promise<boolean> {
-    const result = await db.delete(detectedSubscriptions).where(eq(detectedSubscriptions.id, id));
-    return result.rowCount ? result.rowCount > 0 : false;
+  async deleteDetectedSubscription(id: string, userId?: string): Promise<boolean> {
+    if (userId) {
+      const result = await db.delete(detectedSubscriptions).where(
+        drizzleSql`${detectedSubscriptions.id} = ${id} AND ${detectedSubscriptions.userId} = ${userId}`
+      );
+      return result.rowCount ? result.rowCount > 0 : false;
+    } else {
+      const result = await db.delete(detectedSubscriptions).where(eq(detectedSubscriptions.id, id));
+      return result.rowCount ? result.rowCount > 0 : false;
+    }
   }
 
   // User operations
