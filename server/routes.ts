@@ -1239,6 +1239,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 subscriptionId: session.subscription,
               });
 
+              // Auto-add PocketTrack subscription to user's account (idempotent)
+              try {
+                const plan = PLANS.find((p) => p.id === planId);
+                const planName = plan?.name || planId;
+                const subscriptionName = `PocketTrack ${planName}`;
+                
+                // Check if user already has a PocketTrack subscription (idempotency check)
+                // Check ALL PocketTrack subscriptions (including cancelled ones) to prevent duplicates on resubscription
+                const existingSubscriptions = await storage.getSubscriptionsByUserId(userId);
+                const hasPocketTrackSub = existingSubscriptions.some(
+                  (sub) => sub.name.startsWith("PocketTrack ")
+                );
+                
+                if (!hasPocketTrackSub) {
+                  // Get plan price for the subscription
+                  const monthlyPrice = plan?.monthlyPrice || 0;
+                  
+                  // Calculate next renewal date (1 month from now)
+                  const nextRenewalDate = new Date();
+                  nextRenewalDate.setMonth(nextRenewalDate.getMonth() + 1);
+                  
+                  await storage.createSubscription({
+                    userId,
+                    name: subscriptionName,
+                    cost: monthlyPrice.toString(),
+                    billingCycle: "Monthly",
+                    category: "Software",
+                    nextRenewalDate,
+                    notes: "Your PocketTrack subscription",
+                  });
+                  
+                  logger.info("Auto-added PocketTrack subscription", {
+                    userId,
+                    subscriptionName,
+                    cost: monthlyPrice,
+                  });
+                } else {
+                  logger.info("PocketTrack subscription already exists, skipping auto-add", {
+                    userId,
+                    planName,
+                  });
+                }
+              } catch (error) {
+                // Non-critical error - log but don't fail the webhook
+                logger.error("Failed to auto-add PocketTrack subscription", {
+                  error,
+                  userId,
+                  planId,
+                });
+              }
+
               // Send payment confirmation email (non-blocking)
               const user = await storage.getUser(userId);
               if (user?.email) {

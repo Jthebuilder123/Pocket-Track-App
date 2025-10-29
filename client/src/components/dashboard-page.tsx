@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText, LogOut, LogIn, User, Upload, Crown } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,12 @@ export function DashboardPage() {
   const { data: user } = useQuery<{ email: string } | null>({
     queryKey: ["/api/auth/me"],
     retry: false,
+  });
+
+  // Get user's current plan
+  const { data: userPlan } = useQuery<{ plan: string }>({
+    queryKey: ["/api/user/plan"],
+    enabled: !!user,
   });
 
   // Auto-migrate guest data when user signs up
@@ -255,17 +261,31 @@ export function DashboardPage() {
       {/* Header */}
       <header className="border-b bg-background sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CreditCard className="w-6 h-6 text-primary" />
-            <h1 className="text-xl font-semibold">PocketTrack</h1>
-          </div>
+          <Link href="/" data-testid="link-logo">
+            <div className="flex items-center gap-3 cursor-pointer hover-elevate active-elevate-2 px-2 py-1 rounded-md">
+              <CreditCard className="w-6 h-6 text-primary" />
+              <h1 className="text-xl font-semibold">PocketTrack</h1>
+            </div>
+          </Link>
           <div className="flex items-center gap-2">
             {user && (
-              <div className="flex items-center gap-2 mr-2">
-                <User className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground" data-testid="text-user-email">
-                  {user.email}
-                </span>
+              <div className="flex items-center gap-3 mr-2">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground" data-testid="text-user-email">
+                    {user.email}
+                  </span>
+                </div>
+                {userPlan && (
+                  <Badge
+                    variant={userPlan.plan === "pro" ? "default" : userPlan.plan === "essentials" ? "secondary" : "outline"}
+                    className="gap-1"
+                    data-testid="badge-current-plan"
+                  >
+                    <Crown className="w-3 h-3" data-testid="icon-plan-crown" />
+                    {userPlan.plan.charAt(0).toUpperCase() + userPlan.plan.slice(1)}
+                  </Badge>
+                )}
               </div>
             )}
             <Button

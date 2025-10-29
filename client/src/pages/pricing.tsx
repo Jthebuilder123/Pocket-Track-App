@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Check, X, Loader2 } from "lucide-react";
+import { Check, X, Loader2, ArrowRight, Sparkles, HelpCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PlanFeatures {
   maxSubscriptions: number | null;
@@ -48,6 +50,7 @@ interface UserPlanLimits {
 
 export default function Pricing() {
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -83,21 +86,20 @@ export default function Pricing() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success") === "true") {
-      toast({
-        title: "Success!",
-        description: "Your subscription is now active. Enjoy your new features!",
-      });
+      setShowSuccessBanner(true);
       queryClient.invalidateQueries({ queryKey: ["/api/user/plan"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      navigate("/pricing");
+      // Clean up URL without reloading
+      window.history.replaceState({}, '', '/pricing');
     } else if (params.get("canceled") === "true") {
       toast({
         title: "Checkout Canceled",
         description: "Your checkout was canceled. No charges were made.",
       });
-      navigate("/pricing");
+      // Clean up URL without reloading
+      window.history.replaceState({}, '', '/pricing');
     }
-  }, [toast, navigate]);
+  }, [toast]);
 
   const getFeatureDisplay = (feature: keyof PlanFeatures, value: any, planName: string) => {
     if (typeof value === "boolean") {
@@ -134,6 +136,40 @@ export default function Pricing() {
 
   return (
     <div className="container mx-auto py-8 px-4">
+      {/* Success Banner */}
+      {showSuccessBanner && currentPlan && (
+        <Alert className="mb-8 border-primary bg-primary/5" data-testid="alert-purchase-success">
+          <Sparkles className="h-5 w-5 text-primary" data-testid="icon-sparkles" />
+          <AlertTitle className="text-lg font-semibold" data-testid="text-success-title">Welcome to {currentPlan.plan}!</AlertTitle>
+          <AlertDescription className="mt-2">
+            <p className="mb-4" data-testid="text-success-message">
+              Your subscription is now active! You now have access to all {currentPlan.plan} features including:
+            </p>
+            <ul className="list-disc list-inside space-y-1 mb-4 text-sm" data-testid="list-unlocked-features">
+              {currentPlan.features.analytics && <li data-testid="feature-analytics">Advanced Analytics Dashboard</li>}
+              {currentPlan.features.exportData && <li data-testid="feature-export">Export Data (CSV/JSON)</li>}
+              {currentPlan.features.importData && <li data-testid="feature-import">Import Data (CSV/Excel)</li>}
+              {currentPlan.features.webhooks && <li data-testid="feature-webhooks">Webhook Integrations</li>}
+              {currentPlan.features.emailNotifications && <li data-testid="feature-email">Email Notifications</li>}
+              {(currentPlan.subscriptions.limit === null || currentPlan.subscriptions.limit > 10) && (
+                <li data-testid="feature-unlimited-subs">Unlimited Subscriptions</li>
+              )}
+              {(currentPlan.bankConnections.limit === null || currentPlan.bankConnections.limit > 1) && (
+                <li data-testid="feature-bank-connections">Multiple Bank Connections</li>
+              )}
+            </ul>
+            <Button
+              onClick={() => navigate("/")}
+              className="gap-2"
+              data-testid="button-go-to-dashboard"
+            >
+              Go to Dashboard
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-3" data-testid="text-pricing-title">
           Simple, Transparent Pricing
@@ -201,7 +237,27 @@ export default function Pricing() {
                   {allFeatures.map((feature) => (
                     <li key={feature.key} className="flex items-center gap-3">
                       {getFeatureDisplay(feature.key, plan.features[feature.key], plan.name)}
-                      <span className="text-sm">{feature.label}</span>
+                      <span className="text-sm flex items-center gap-1">
+                        {feature.label}
+                        {feature.key === "webhooks" && plan.features[feature.key] && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs" data-testid="tooltip-webhook-help">
+                              <p className="text-sm">
+                                <strong>Webhooks</strong> automatically notify your other apps when something happens in PocketTrack.
+                              </p>
+                              <p className="text-sm mt-2">
+                                <strong>Example:</strong> When you add or cancel a subscription, PocketTrack can send a notification to your spreadsheet, budgeting app, or custom automation tool.
+                              </p>
+                              <p className="text-sm mt-2 text-muted-foreground">
+                                Perfect for developers and power users who want to integrate PocketTrack with other services.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
                     </li>
                   ))}
                 </ul>

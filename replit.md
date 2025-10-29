@@ -69,6 +69,39 @@ The system is built with a clear separation of concerns between client and serve
 - **ApiError Class Implementation** (October 28, 2025): Created custom `ApiError` class extending Error with a `status` property for robust, type-safe error handling throughout the application. Replaced fragile string-based error message parsing (`error.message.includes("401")`) with proper instanceof checks (`error instanceof ApiError && error.status === 401`), making error handling more maintainable and resistant to future API response changes.
 - **Debug Logging Cleanup** (October 28, 2025): Gated all ungated debug console.logs in bank connection component with `DEBUG_BANK_CONNECT` flag (set to `import.meta.env.DEV`), ensuring verbose logging only appears in development mode and is automatically disabled in production builds.
 
+### Beta Tester Feedback Improvements (October 29, 2025)
+Implemented comprehensive UX enhancements based on beta tester feedback to improve navigation, visual clarity, and feature understanding:
+
+- **Clickable Logo Navigation**: The PocketTrack logo in the header is now clickable and navigates users back to the homepage/dashboard. Includes hover and active states for better interactivity.
+- **Enhanced Post-Purchase Experience**: After successful Stripe checkout, users see a prominent success banner on the pricing page displaying:
+  - Welcome message with their new plan name
+  - Bulleted list of all unlocked features for their tier
+  - "Go to Dashboard" button for immediate access to the app
+  - Prevents users from being stuck on the pricing page after upgrading
+- **Visual Plan Differentiation**: 
+  - Current plan badge displayed in header next to user email (Free/Essentials/Pro)
+  - Badge styling varies by plan tier (outline for Free, secondary for Essentials, primary for Pro)
+  - Provides constant visual reminder of active subscription level
+- **Webhook Feature Explanations**: Added contextual help tooltip on the pricing page explaining webhooks in non-technical language:
+  - Simple explanation: "Webhooks automatically notify your other apps when something happens in PocketTrack"
+  - Real-world example: Sending notifications to spreadsheets or budgeting apps
+  - Target audience clarification: "Perfect for developers and power users"
+  - Reduces confusion about this Pro-tier feature
+- **Template Tier-Level Pricing**: Expanded subscription templates to include service-specific pricing tiers:
+  - **Streaming Services**: Netflix (Standard with ads $6.99, Standard $15.49, Premium $22.99), Disney+ (Basic with ads $7.99, Premium $13.99), Max (With Ads $9.99, Ad-Free $15.99, Ultimate $19.99), Hulu (With Ads $7.99, No Ads $17.99)
+  - **Music Services**: Spotify (Individual $10.99, Duo $14.99, Family $16.99), Apple Music (Individual $10.99, Family $16.99), YouTube Music (Individual $10.99, Family $16.99)
+  - Users can now select the exact tier they're subscribed to instead of average pricing
+  - Improves template accuracy and user experience
+- **Auto-Add PocketTrack Subscription**: When users subscribe to Essentials or Pro plans via Stripe checkout:
+  - System automatically creates a "PocketTrack [Plan Name]" subscription in their account
+  - Subscription includes correct monthly price based on plan tier
+  - Next renewal date set to one month from purchase
+  - Idempotent implementation prevents duplicate entries
+  - Non-critical failure handling ensures webhook processing continues even if auto-add fails
+  - Helps users immediately see their PocketTrack subscription tracked within the app itself
+
+These improvements address the main pain points identified in beta testing: navigation confusion after purchase, unclear plan benefits, webhook feature confusion, and template pricing accuracy.
+
 ## External Dependencies
 - **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection. Requires `PLAID_CLIENT_ID` and `PLAID_SECRET`.
 - **Stripe**: Payment processing for subscription plans with webhook-based plan activation. Requires `STRIPE_SECRET_KEY`. Pricing is defined dynamically in `shared/pricing.ts`.

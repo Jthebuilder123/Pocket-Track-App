@@ -3,11 +3,17 @@ import { subscriptionTemplates } from "@shared/schema";
 import type { InsertSubscriptionTemplate } from "@shared/schema";
 
 const templates: InsertSubscriptionTemplate[] = [
-  // Streaming Services (15)
-  { name: "Netflix", category: "Streaming", suggestedPrice: "15.49", billingCycle: "Monthly", description: "Movies and TV shows", popularity: "100" },
-  { name: "Disney+", category: "Streaming", suggestedPrice: "13.99", billingCycle: "Monthly", description: "Disney, Pixar, Marvel, Star Wars", popularity: "95" },
-  { name: "Max (HBO Max)", category: "Streaming", suggestedPrice: "15.99", billingCycle: "Monthly", description: "HBO, Warner Bros content", popularity: "90" },
-  { name: "Hulu", category: "Streaming", suggestedPrice: "17.99", billingCycle: "Monthly", description: "TV shows and movies", popularity: "88" },
+  // Streaming Services (with tier options for popular services)
+  { name: "Netflix (Standard with ads)", category: "Streaming", suggestedPrice: "6.99", billingCycle: "Monthly", description: "Movies and TV shows with ads", popularity: "100" },
+  { name: "Netflix (Standard)", category: "Streaming", suggestedPrice: "15.49", billingCycle: "Monthly", description: "Movies and TV shows, HD quality", popularity: "100" },
+  { name: "Netflix (Premium)", category: "Streaming", suggestedPrice: "22.99", billingCycle: "Monthly", description: "Movies and TV shows, 4K Ultra HD", popularity: "100" },
+  { name: "Disney+ (Basic with ads)", category: "Streaming", suggestedPrice: "7.99", billingCycle: "Monthly", description: "Disney, Pixar, Marvel, Star Wars with ads", popularity: "95" },
+  { name: "Disney+ (Premium)", category: "Streaming", suggestedPrice: "13.99", billingCycle: "Monthly", description: "Disney, Pixar, Marvel, Star Wars, ad-free", popularity: "95" },
+  { name: "Max (With Ads)", category: "Streaming", suggestedPrice: "9.99", billingCycle: "Monthly", description: "HBO, Warner Bros content with ads", popularity: "90" },
+  { name: "Max (Ad-Free)", category: "Streaming", suggestedPrice: "15.99", billingCycle: "Monthly", description: "HBO, Warner Bros content, no ads", popularity: "90" },
+  { name: "Max (Ultimate Ad-Free)", category: "Streaming", suggestedPrice: "19.99", billingCycle: "Monthly", description: "HBO, Warner Bros, 4K Ultra HD, no ads", popularity: "90" },
+  { name: "Hulu (With Ads)", category: "Streaming", suggestedPrice: "7.99", billingCycle: "Monthly", description: "TV shows and movies with ads", popularity: "88" },
+  { name: "Hulu (No Ads)", category: "Streaming", suggestedPrice: "17.99", billingCycle: "Monthly", description: "TV shows and movies, ad-free", popularity: "88" },
   { name: "Amazon Prime Video", category: "Streaming", suggestedPrice: "14.99", billingCycle: "Monthly", description: "Movies, TV, Amazon Originals", popularity: "92" },
   { name: "Apple TV+", category: "Streaming", suggestedPrice: "9.99", billingCycle: "Monthly", description: "Apple Original shows and movies", popularity: "85" },
   { name: "Peacock", category: "Streaming", suggestedPrice: "11.99", billingCycle: "Monthly", description: "NBCUniversal content", popularity: "75" },
@@ -20,10 +26,14 @@ const templates: InsertSubscriptionTemplate[] = [
   { name: "ESPN+", category: "Streaming", suggestedPrice: "10.99", billingCycle: "Monthly", description: "Live sports and originals", popularity: "72" },
   { name: "Criterion Channel", category: "Streaming", suggestedPrice: "10.99", billingCycle: "Monthly", description: "Classic and art-house films", popularity: "55" },
 
-  // Music Streaming (12)
-  { name: "Spotify Premium", category: "Music", suggestedPrice: "10.99", billingCycle: "Monthly", description: "Ad-free music streaming", popularity: "98" },
-  { name: "Apple Music", category: "Music", suggestedPrice: "10.99", billingCycle: "Monthly", description: "100M+ songs", popularity: "95" },
-  { name: "YouTube Music Premium", category: "Music", suggestedPrice: "10.99", billingCycle: "Monthly", description: "Ad-free music", popularity: "82" },
+  // Music Streaming (with tier options for popular services)
+  { name: "Spotify Premium (Individual)", category: "Music", suggestedPrice: "10.99", billingCycle: "Monthly", description: "Ad-free music streaming for 1 account", popularity: "98" },
+  { name: "Spotify Premium (Duo)", category: "Music", suggestedPrice: "14.99", billingCycle: "Monthly", description: "Ad-free music for 2 accounts", popularity: "98" },
+  { name: "Spotify Premium (Family)", category: "Music", suggestedPrice: "16.99", billingCycle: "Monthly", description: "Ad-free music for up to 6 accounts", popularity: "98" },
+  { name: "Apple Music (Individual)", category: "Music", suggestedPrice: "10.99", billingCycle: "Monthly", description: "100M+ songs for 1 account", popularity: "95" },
+  { name: "Apple Music (Family)", category: "Music", suggestedPrice: "16.99", billingCycle: "Monthly", description: "100M+ songs for up to 6 accounts", popularity: "95" },
+  { name: "YouTube Music Premium (Individual)", category: "Music", suggestedPrice: "10.99", billingCycle: "Monthly", description: "Ad-free music for 1 account", popularity: "82" },
+  { name: "YouTube Music Premium (Family)", category: "Music", suggestedPrice: "16.99", billingCycle: "Monthly", description: "Ad-free music for up to 6 accounts", popularity: "82" },
   { name: "Amazon Music Unlimited", category: "Music", suggestedPrice: "10.99", billingCycle: "Monthly", description: "100M+ songs", popularity: "80" },
   { name: "Tidal", category: "Music", suggestedPrice: "10.99", billingCycle: "Monthly", description: "Hi-fi music streaming", popularity: "68" },
   { name: "Pandora Plus", category: "Music", suggestedPrice: "4.99", billingCycle: "Monthly", description: "Ad-free radio", popularity: "70" },
