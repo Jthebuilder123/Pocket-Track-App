@@ -11,6 +11,25 @@ PocketTrack is a modern web application designed to help users efficiently track
 
 ## System Architecture
 
+### Repository Structure
+PocketTrack uses a **two-repository architecture**:
+
+1. **Main Web Application** (this repository):
+   - Express backend + React frontend
+   - Deployed as a web application (e.g., Replit deployment)
+   - Accessed via browser at your deployment URL
+   - Serves as the primary application for all platforms
+
+2. **Mobile App Wrapper** (`pockettrack-mobile/` directory → separate repository):
+   - Expo/React Native WebView wrapper
+   - Loads the hosted web app in a native container
+   - Handles external links (Plaid, Stripe) by opening in system browser
+   - Built and submitted to App Store/Google Play using EAS Build
+   - Bundle ID: `com.pockettrack.app`
+   - **Setup**: Copy the `pockettrack-mobile/` directory to a new GitHub repository, update `POCKETTRACK_URL` to your deployed web app URL, then follow the instructions in `pockettrack-mobile/GITHUB-SETUP.md`
+
+This separation keeps the web application clean while providing native mobile distribution through app stores.
+
 ### UI/UX Decisions
 The application features a responsive design built with React and Shadcn UI, styled using Tailwind CSS. It utilizes Recharts for data visualization, presenting spending analytics by category and billing frequency, and a timeline view for upcoming renewals. The design emphasizes clarity, information density, and smooth interactions, inspired by modern SaaS dashboards like Linear and Notion.
 
