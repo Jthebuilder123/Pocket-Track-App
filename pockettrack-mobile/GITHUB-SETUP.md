@@ -89,9 +89,9 @@ This will:
 
 ### Hosted Web App
 - The mobile app loads: `https://your-replit-deployment.replit.app`
-- Update the `HOSTED_WEB_APP_URL` in `App.js` before building:
+- Update the `POCKETTRACK_URL` in `App.js` before building:
   ```javascript
-  const HOSTED_WEB_APP_URL = 'https://YOUR-APP-URL.replit.app';
+  const POCKETTRACK_URL = 'https://YOUR-APP-URL.replit.app';
   ```
 
 ### Required Assets
@@ -114,7 +114,7 @@ See `assets/README-ASSETS.txt` for details.
 - For Android: You need a Google Play Console account ($25 one-time)
 
 ### App opens but shows blank screen
-- Check that `HOSTED_WEB_APP_URL` is correct
+- Check that `POCKETTRACK_URL` is correct in `App.js`
 - Verify your web app is deployed and accessible
 - Check the network logs in the Expo development client
 

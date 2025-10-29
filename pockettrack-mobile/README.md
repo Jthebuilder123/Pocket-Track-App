@@ -22,7 +22,7 @@ A minimal Expo React Native wrapper that loads your hosted PocketTrack web app i
 ### 1. Install Dependencies
 
 ```bash
-cd expo-wrapper
+cd pockettrack-mobile
 npm install
 ```
 
