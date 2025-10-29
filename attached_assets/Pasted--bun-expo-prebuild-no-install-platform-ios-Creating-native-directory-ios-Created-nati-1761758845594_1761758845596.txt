@@ -1,0 +1,24 @@
+> bun expo prebuild --no-install --platform ios
+- Creating native directory (./ios)
+✔ Created native directory
+- Updating package.json
+› Using current versions instead of recommended react-native@0.76.9.
+- Updating package.json
+✔ Updated package.json
+- Running prebuild
+✖ Prebuild failed
+Error: [ios.dangerous]: withIosDangerousBaseMod: ENOENT: no such file or directory, open './assets/icon.png'
+Error: [ios.dangerous]: withIosDangerousBaseMod: ENOENT: no such file or directory, open './assets/icon.png'
+    at Object.openSync (node:fs:574:18)
+    at readFileSync (node:fs:453:35)
+    at calculateHash (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/image-utils/build/Cache.js:14:91)
+    at createCacheKey (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/image-utils/build/Cache.js:19:18)
+    at Object.createCacheKeyWithDirectoryAsync (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/image-utils/build/Cache.js:28:33)
+    at generateImageAsync (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/image-utils/build/Image.js:211:34)
+    at async generateUniversalIconAsync (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/prebuild-config/build/plugins/icons/withIosIcons.js:159:15)
+    at async setIconsAsync (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/prebuild-config/build/plugins/icons/withIosIcons.js:93:20)
+    at async /Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/prebuild-config/build/plugins/icons/withIosIcons.js:54:5
+    at async action (/Users/expo/workingdir/build/pockettrack-mobile/node_modules/@expo/config-plugins/build/plugins/withMod.js:199:23)
+error: "expo" exited with code 1
+[31mError: bun expo prebuild --no-install --platform ios exited with non-zero code: 1[39m
+/bin/bash --login -eo pipefail /var/folders/m1/8_w9962s3b79dqm00nnlm85m0000gn/T/eas-build/43bc82a1-f0a5-4fa3-876b-fde4ae0037b3/steps/bcb0aa5f-2bde-432b-80ff-89676b2df51d/scripts/89d28b51-4b3b-4fd0-981b-f6e0bcb54901.sh exited with non-zero code: 1
