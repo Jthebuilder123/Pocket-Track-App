@@ -44,6 +44,14 @@ The application features a responsive design built with React and Shadcn UI, sty
     - Visual analytics dashboard.
     - Export and import functionalities (CSV/JSON) gated by plan tier.
     - **Bank Statement Import**: Upload bank statements (PDF/CSV/Excel) to automatically detect recurring transactions and suggest subscriptions for approval. Uses pdf-parse, papaparse, and xlsx libraries with pattern analysis.
+    - **Plaid Bank Integration**: 
+        - Direct bank account connectivity via Plaid Link for secure transaction access
+        - Automatic transaction syncing from connected bank accounts
+        - Intelligent recurring subscription detection with confidence scoring
+        - Multi-tenant data isolation enforced at database and storage layer
+        - Pattern matching algorithm analyzes transaction history to identify subscriptions
+        - Detected subscriptions displayed in dedicated dashboard tab for user review/approval
+        - One-click confirmation to convert detected subscriptions into tracked subscriptions
     - Webhook system for external integrations gated by plan tier.
     - **Email Notifications**: 
         - Payment confirmation emails sent via SendGrid when users subscribe to paid plans through Stripe checkout
@@ -68,6 +76,13 @@ The system is built with a clear separation of concerns between client and serve
 - **Guest Deletion 401 Error Fix** (October 28, 2025): Implemented guest-aware deletion with localStorage fallback in the `useDeleteSubscription` hook. Previously, the subscription card component bypassed the guest-aware hook and directly called the API, causing 401 errors for guest users. The fix centralizes deletion logic with automatic fallback to localStorage when receiving 401 responses, preventing error loops during auth state transitions.
 - **ApiError Class Implementation** (October 28, 2025): Created custom `ApiError` class extending Error with a `status` property for robust, type-safe error handling throughout the application. Replaced fragile string-based error message parsing (`error.message.includes("401")`) with proper instanceof checks (`error instanceof ApiError && error.status === 401`), making error handling more maintainable and resistant to future API response changes.
 - **Debug Logging Cleanup** (October 28, 2025): Gated all ungated debug console.logs in bank connection component with `DEBUG_BANK_CONNECT` flag (set to `import.meta.env.DEV`), ensuring verbose logging only appears in development mode and is automatically disabled in production builds.
+- **Plaid Multi-Tenant Security Fix** (October 29, 2025): Fixed critical data leak vulnerability in Plaid integration where `detectedSubscriptions` table lacked `userId` field, allowing users to see detected subscriptions from other users. Implemented comprehensive security hardening:
+  - Added `userId` field to `detectedSubscriptions` schema with proper indexing
+  - Updated all storage layer methods to enforce userId filtering (getDetectedSubscriptionsByUserId, getDetectedSubscription, detectSubscriptionsFromTransactions, markDetectedSubscriptionAsConfirmed, deleteDetectedSubscription)
+  - Modified all API routes to pass userId for ownership verification
+  - Implemented defense-in-depth: storage layer validates userId even if routes are changed in future
+  - Applied database migration successfully with zero data loss
+  - All Plaid transaction sync and bank statement upload flows now properly isolate data by tenant
 
 ### Beta Tester Feedback Improvements (October 29, 2025)
 Implemented comprehensive UX enhancements based on beta tester feedback to improve navigation, visual clarity, and feature understanding:
@@ -103,7 +118,42 @@ Implemented comprehensive UX enhancements based on beta tester feedback to impro
 These improvements address the main pain points identified in beta testing: navigation confusion after purchase, unclear plan benefits, webhook feature confusion, and template pricing accuracy.
 
 ## External Dependencies
-- **Plaid API**: Used for secure bank account integration, transaction analysis, and automatic subscription detection. Requires `PLAID_CLIENT_ID` and `PLAID_SECRET`.
-- **Stripe**: Payment processing for subscription plans with webhook-based plan activation. Requires `STRIPE_SECRET_KEY`. Pricing is defined dynamically in `shared/pricing.ts`.
-- **PostgreSQL**: Relational database for all application data storage with proper multi-tenant isolation.
+- **Plaid API**: Production-ready bank account integration for secure transaction access and automatic subscription detection. Requires `PLAID_CLIENT_ID`, `PLAID_SECRET`, and `PLAID_ENV` (set to "production"). Supports direct bank connections via Plaid Link with OAuth-based authorization flow.
+- **Stripe**: Payment processing for subscription plans with webhook-based plan activation. Requires `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`. Pricing is defined dynamically in `shared/pricing.ts`.
+- **PostgreSQL**: Relational database for all application data storage with proper multi-tenant isolation enforced at schema and storage layer.
 - **SendGrid**: (Configurable) for email delivery of magic links and notifications. Requires `SENDGRID_API_KEY`.
+
+## Plaid Integration Architecture
+
+### Components
+- **BankConnect** (`client/src/components/bank-connect.tsx`): UI component for managing bank connections, initiating Plaid Link, and syncing transactions
+- **DetectedSubscriptions** (`client/src/components/detected-subscriptions.tsx`): Displays pending detected subscriptions with confidence scores for user approval
+- **Plaid Service** (`server/plaid.ts`): Backend service handling Plaid API communication, token exchange, and transaction retrieval
+
+### Database Schema
+- **bankConnections**: Stores connected bank account metadata (institutionId, institutionName, accessToken, itemId, lastSyncedAt) with userId for multi-tenant isolation
+- **detectedSubscriptions**: Stores pending subscription suggestions (merchantName, estimatedCost, detectedBillingCycle, confidence, category, status) with userId for secure data isolation
+
+### Security Model
+- Multi-tenant data isolation enforced through userId field on all Plaid-related tables
+- Storage layer validates userId on all read/write operations to prevent cross-tenant data access
+- API routes require authentication and pass userId to storage methods for ownership verification
+- Access tokens encrypted at rest in database and never exposed to frontend
+
+### Workflow
+1. User clicks "Connect Bank Account" in dashboard Bank Connections tab
+2. Frontend requests Plaid Link token from `/api/plaid/create-link-token`
+3. Plaid Link modal opens for user to authenticate with their bank
+4. After successful authentication, frontend exchanges public token via `/api/plaid/exchange-token`
+5. Backend stores bank connection with encrypted access token
+6. User can manually sync transactions via "Sync Transactions" button
+7. Backend fetches transactions using Plaid API, analyzes for recurring patterns
+8. Detected subscriptions appear in Detected Subscriptions tab with confidence scores
+9. User reviews and confirms/dismisses detected subscriptions
+10. Confirmed subscriptions convert to tracked subscriptions in main dashboard
+
+### Testing Notes
+- Production Plaid environment requires real bank credentials and includes reCAPTCHA for security
+- Automated testing blocked by reCAPTCHA requirement (expected behavior)
+- Manual testing recommended for end-to-end validation
+- Sandbox environment available for development testing with test credentials (username: user_good, password: pass_good)
