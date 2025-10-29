@@ -1,0 +1,69 @@
+═══════════════════════════════════════════════════════════════
+  INSTRUCTIONS: Upload This Folder to Your GitHub Repository
+═══════════════════════════════════════════════════════════════
+
+This folder contains your mobile app files structured EXACTLY as they 
+should appear at the ROOT of your GitHub repository.
+
+STEP 1: Download This Folder
+────────────────────────────────────────────────────────────────
+In Replit:
+  - Right-click the "MOBILE-APP-FOR-GITHUB" folder
+  - Select "Download"
+  - Save it to your computer
+
+STEP 2: Upload to GitHub Root
+────────────────────────────────────────────────────────────────
+Go to: https://github.com/Jthebuilder123/Pocket-Track-App
+
+Option A - Replace Everything (Easiest):
+  1. Delete the existing "pockettrack-mobile" folder on GitHub
+  2. Click "Add file" → "Upload files"
+  3. Drag ALL files from inside MOBILE-APP-FOR-GITHUB folder
+     (App.js, package.json, app.json, eas.json, assets folder, etc.)
+  4. Make sure they're at the ROOT level, not in a subfolder
+  5. Commit the changes
+
+Option B - Manual Move:
+  1. For each file in "pockettrack-mobile/" on GitHub:
+     - Edit the file
+     - Remove "pockettrack-mobile/" from the path
+     - Commit
+  2. Delete empty "pockettrack-mobile/" folder
+
+STEP 3: Verify Structure
+────────────────────────────────────────────────────────────────
+Your GitHub repo should look like:
+
+Pocket-Track-App/
+├── App.js              ← At root!
+├── package.json        ← At root!
+├── app.json            ← At root!
+├── eas.json            ← At root!
+├── assets/             ← At root!
+│   ├── icon.png
+│   ├── splash.png
+│   └── ...
+└── GITHUB-SETUP.md
+
+NOT like this:
+Pocket-Track-App/
+└── pockettrack-mobile/     ← WRONG!
+    ├── App.js
+    └── ...
+
+STEP 4: Rebuild Your App
+────────────────────────────────────────────────────────────────
+After uploading:
+  1. Open terminal on your computer
+  2. Navigate to your repository folder
+  3. Run: git pull
+  4. Run: eas build --platform ios
+  5. Wait for build (~10-20 min)
+  6. Install new build from TestFlight
+  7. Open app - should now load PocketTrack correctly!
+
+═══════════════════════════════════════════════════════════════
+Questions? The files in this folder are ready to go - just make
+sure they end up at the ROOT of your GitHub repository!
+═══════════════════════════════════════════════════════════════
