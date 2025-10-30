@@ -91,20 +91,25 @@ export function BankConnect() {
   // Create link token mutation
   const createLinkTokenMutation = useMutation({
     mutationFn: async () => {
-      if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Creating link token via API...");
-      const response = await apiRequest("POST", "/api/plaid/create-link-token");
-      const data = await response.json();
-      if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Link token created successfully");
-      return data;
+      console.log("[BANK-CONNECT] API call: Creating Plaid link token...");
+      try {
+        const response = await apiRequest("POST", "/api/plaid/create-link-token");
+        const data = await response.json();
+        console.log("[BANK-CONNECT] Link token created successfully");
+        return data;
+      } catch (error) {
+        console.error("[BANK-CONNECT] API error creating link token:", error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
-      if (DEBUG_BANK_CONNECT) console.log("[DEBUG] onSuccess: Link token received, setting state");
+      console.log("[BANK-CONNECT] Mutation success: Link token received");
       setLinkToken(data.link_token);
     },
     onError: (error) => {
-      if (DEBUG_BANK_CONNECT) console.error("[DEBUG] onError: Link token creation failed", error);
+      console.error("[BANK-CONNECT] Mutation error: Link token creation failed", error);
       const { message, isLimitError } = getErrorMessage(error);
-      if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Parsed error:", { message, isLimitError });
+      console.log("[BANK-CONNECT] Parsed error:", { message, isLimitError });
       toast({
         title: isLimitError ? "Plan Limit Reached" : "Connection Failed",
         description: message,
@@ -244,23 +249,28 @@ export function BankConnect() {
 
   const handleConnect = () => {
     try {
+      // Always log button clicks for debugging
+      console.log("[BANK-CONNECT] Button clicked");
+      console.log("[BANK-CONNECT] isGuest:", isGuest);
+      console.log("[BANK-CONNECT] linkToken exists:", !!linkToken);
+      console.log("[BANK-CONNECT] Plaid Link ready:", ready);
+      console.log("[BANK-CONNECT] createLinkToken pending:", createLinkTokenMutation.isPending);
+      console.log("[BANK-CONNECT] exchangeToken pending:", exchangeTokenMutation.isPending);
+      
       if (DEBUG_BANK_CONNECT) {
-        console.log("[DEBUG] Connect Bank button clicked");
-        console.log("[DEBUG] isGuest:", isGuest);
-        console.log("[DEBUG] linkToken:", linkToken ? "exists" : "null");
-        console.log("[DEBUG] ready:", ready);
-        console.log("[DEBUG] isPending:", createLinkTokenMutation.isPending);
+        console.log("[DEBUG] Full linkToken:", linkToken);
+        console.log("[DEBUG] Plaid config:", config);
       }
       
       if (linkToken && ready) {
-        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Link token ready, opening Plaid Link modal");
+        console.log("[BANK-CONNECT] Opening Plaid Link modal...");
         open();
       } else {
-        if (DEBUG_BANK_CONNECT) console.log("[DEBUG] Creating link token, ready status:", ready);
+        console.log("[BANK-CONNECT] Creating link token...");
         createLinkTokenMutation.mutate();
       }
     } catch (error) {
-      if (DEBUG_BANK_CONNECT) console.error("[DEBUG] Error in handleConnect:", error);
+      console.error("[BANK-CONNECT] ERROR in handleConnect:", error);
       toast({
         title: "Connection Error",
         description: "An unexpected error occurred. Please check the console for details.",
