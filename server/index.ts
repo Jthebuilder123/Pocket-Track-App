@@ -7,9 +7,42 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Security middleware
+// Security middleware with custom CSP for Plaid and Stripe integration
 app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'", // Required for inline scripts in smoke test and main app
+        "https://cdn.plaid.com", // Plaid Link SDK
+        "https://checkout.stripe.com", // Stripe checkout
+        "https://js.stripe.com", // Stripe.js
+      ],
+      connectSrc: [
+        "'self'",
+        "https://*.plaid.com", // Plaid API endpoints
+        "https://api.stripe.com", // Stripe API
+      ],
+      frameSrc: [
+        "'self'",
+        "https://checkout.stripe.com", // Stripe checkout iframe
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'", // Required for inline styles
+      ],
+      imgSrc: [
+        "'self'",
+        "data:", // For inline images
+        "https:", // Allow external images
+      ],
+      formAction: [
+        "'self'",
+        "https://checkout.stripe.com", // Allow form submissions to Stripe
+      ],
+    },
+  },
 }));
 
 // CORS configuration
