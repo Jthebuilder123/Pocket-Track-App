@@ -26,6 +26,7 @@ app.use(helmet({
       ],
       frameSrc: [
         "'self'",
+        "https://cdn.plaid.com", // Plaid Link iframe
         "https://checkout.stripe.com", // Stripe checkout iframe
       ],
       styleSrc: [

@@ -406,14 +406,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           try {
             console.log('[SMOKE TEST] Creating Stripe checkout session...');
-            const response = await fetch('/api/stripe/create-checkout-session', {
+            const response = await fetch('/api/create-checkout-session', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
               body: JSON.stringify({ 
-                priceId: 'price_pro_monthly',
-                plan: 'pro',
-                interval: 'month'
+                planId: 'pro',
+                billingInterval: 'monthly'
               })
             });
             
