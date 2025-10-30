@@ -304,15 +304,16 @@ export function SubscriptionModal({ open, onClose, subscription, template }: Sub
 
             {/* Cancellation Assistance Section */}
             <div className="border-t pt-4">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setShowCancellationHelp(!showCancellationHelp)}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+                className="w-full justify-start gap-2 min-h-11 md:min-h-9"
                 data-testid="button-toggle-cancellation"
               >
                 {showCancellationHelp ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                 Cancellation Help (Optional)
-              </button>
+              </Button>
 
               {showCancellationHelp && (
                 <div className="space-y-4 mt-4" data-testid="section-cancellation-help">
