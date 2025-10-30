@@ -71,6 +71,8 @@ function getErrorMessage(error: any): { message: string; isLimitError: boolean }
 }
 
 export function BankConnect() {
+  console.log("[BANK-CONNECT] === BankConnect component rendering ===");
+  
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -79,14 +81,35 @@ export function BankConnect() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const isGuest = !isAuthenticated;
   
-  if (DEBUG_BANK_CONNECT) {
-    console.log("[DEBUG] Auth status:", { isAuthenticated, authLoading, isGuest });
-  }
+  console.log("[BANK-CONNECT] Component state:", { 
+    isAuthenticated, 
+    authLoading, 
+    isGuest,
+    linkToken: !!linkToken 
+  });
 
   const { data: connections = [], isLoading } = useQuery<BankConnection[]>({
     queryKey: ["/api/bank-connections"],
     enabled: !isGuest, // Only fetch if authenticated
   });
+  
+  console.log("[BANK-CONNECT] Connections query:", { 
+    connectionsCount: connections.length, 
+    isLoading 
+  });
+
+  // Component mount logging
+  useEffect(() => {
+    console.log("[BANK-CONNECT] *** Component MOUNTED ***");
+    return () => {
+      console.log("[BANK-CONNECT] *** Component UNMOUNTED ***");
+    };
+  }, []);
+
+  // Track linkToken changes
+  useEffect(() => {
+    console.log("[BANK-CONNECT] linkToken changed:", linkToken ? "Token exists" : "No token");
+  }, [linkToken]);
 
   // Create link token mutation
   const createLinkTokenMutation = useMutation({
@@ -245,12 +268,27 @@ export function BankConnect() {
     onSuccess,
   };
 
-  const { open, ready } = usePlaidLink(config);
+  console.log("[BANK-CONNECT] Plaid config created:", { hasToken: !!linkToken });
+
+  let plaidLinkResult;
+  try {
+    plaidLinkResult = usePlaidLink(config);
+    console.log("[BANK-CONNECT] usePlaidLink successful:", { 
+      ready: plaidLinkResult.ready,
+      hasOpen: !!plaidLinkResult.open 
+    });
+  } catch (error) {
+    console.error("[BANK-CONNECT] ERROR in usePlaidLink:", error);
+    throw error;
+  }
+
+  const { open, ready } = plaidLinkResult;
 
   const handleConnect = () => {
+    console.log("[BANK-CONNECT] ====== BUTTON CLICKED ======");
     try {
       // Always log button clicks for debugging
-      console.log("[BANK-CONNECT] Button clicked");
+      console.log("[BANK-CONNECT] Handler executing...");
       console.log("[BANK-CONNECT] isGuest:", isGuest);
       console.log("[BANK-CONNECT] linkToken exists:", !!linkToken);
       console.log("[BANK-CONNECT] Plaid Link ready:", ready);
@@ -346,6 +384,9 @@ export function BankConnect() {
   }
 
   // Authenticated user UI
+  console.log("[BANK-CONNECT] Rendering authenticated UI with Connect Bank button");
+  console.log("[BANK-CONNECT] Button will be disabled:", createLinkTokenMutation.isPending || exchangeTokenMutation.isPending);
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -356,7 +397,10 @@ export function BankConnect() {
           </p>
         </div>
         <Button
-          onClick={handleConnect}
+          onClick={() => {
+            console.log("[BANK-CONNECT] >>>>>> onClick wrapper fired <<<<<<");
+            handleConnect();
+          }}
           disabled={createLinkTokenMutation.isPending || exchangeTokenMutation.isPending}
           data-testid="button-connect-bank"
         >
