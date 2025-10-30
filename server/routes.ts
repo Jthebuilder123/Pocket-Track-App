@@ -89,8 +89,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Smoke test page for manual testing of critical features
   app.get("/debug/smoke", async (req: any, res) => {
-    const isLoggedIn = !!req.user;
-    const userEmail = isLoggedIn ? req.user.claims.email : null;
+    // Properly check authentication using Passport's method
+    const isLoggedIn = req.isAuthenticated() && !!req.user;
+    const userEmail = isLoggedIn ? req.user.claims?.email : null;
+    
+    // Log authentication state for debugging
+    logger.info("[SMOKE TEST] Page loaded", {
+      isLoggedIn,
+      hasReqUser: !!req.user,
+      isAuthenticated: req.isAuthenticated?.() || false,
+      userEmail,
+      sessionID: req.sessionID,
+      hasSession: !!req.session
+    });
     
     res.send(`
 <!DOCTYPE html>
