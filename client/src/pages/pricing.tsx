@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Check, X, Loader2, ArrowRight, Sparkles, HelpCircle } from "lucide-react";
+import { Check, X as XIcon, Loader2, ArrowRight, Sparkles, HelpCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -106,7 +106,7 @@ export default function Pricing() {
       return value ? (
         <Check className="h-4 w-4 text-primary" data-testid={`icon-check-${planName.toLowerCase()}`} />
       ) : (
-        <X className="h-4 w-4 text-muted-foreground" data-testid={`icon-x-${planName.toLowerCase()}`} />
+        <XIcon className="h-4 w-4 text-muted-foreground" data-testid={`icon-x-${planName.toLowerCase()}`} />
       );
     }
     if (value === null) {
@@ -135,7 +135,16 @@ export default function Pricing() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="container mx-auto py-8 px-4 relative">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-4 right-4 z-50"
+        onClick={() => navigate("/")}
+        data-testid="button-close-pricing"
+      >
+        <XIcon className="h-4 w-4" />
+      </Button>
       {/* Success Banner */}
       {showSuccessBanner && currentPlan && (
         <Alert className="mb-8 border-primary bg-primary/5" data-testid="alert-purchase-success">
