@@ -154,18 +154,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       font-weight: 500;
       margin-right: 10px;
       margin-bottom: 10px;
-      transition: background 0.2s;
+      transition: all 0.2s ease;
     }
-    button:hover:not(:disabled) { background: #1e293b; }
+    button:hover:not(:disabled) { 
+      background: #1e293b;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    button:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
     button:disabled {
       background: #cbd5e1;
       cursor: not-allowed;
+      opacity: 0.6;
     }
     button.secondary {
       background: #64748b;
     }
     button.secondary:hover:not(:disabled) {
       background: #475569;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
     .result {
       margin-top: 15px;
@@ -197,6 +208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       <p>Tests the complete Plaid Link flow: create link token → open modal → exchange public token → save connection</p>
       <button 
         id="btn-connect-bank" 
+        data-testid="btn-connect-bank"
         data-action="connect-bank"
         ${!isLoggedIn ? 'disabled title="Login required"' : ''}
       >
@@ -211,6 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       <p>Tests Stripe checkout flow for Pro plan monthly subscription ($19.99/month)</p>
       <button 
         id="btn-upgrade-pro" 
+        data-testid="btn-upgrade-pro"
         ${!isLoggedIn ? 'disabled title="Login required"' : ''}
       >
         ${isLoggedIn ? 'Upgrade to Pro (Monthly)' : 'Login Required'}
@@ -224,6 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       <p>Tests the logout flow and session termination</p>
       <button 
         id="btn-logout" 
+        data-testid="btn-logout"
         class="secondary"
         ${!isLoggedIn ? 'disabled title="Already logged out"' : ''}
       >
@@ -237,139 +251,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     <div class="test-section">
       <h2>4. Login</h2>
       <p>Click to start the login flow (required for other tests)</p>
-      <button id="btn-login">Go to Login</button>
+      <button id="btn-login" data-testid="btn-login">Go to Login</button>
     </div>
     ` : ''}
   </div>
 
   <script>
-    // Utility functions
-    function showResult(elementId, message, isPass) {
-      const el = document.getElementById(elementId);
-      el.textContent = (isPass ? 'PASS: ' : 'FAIL: ') + message;
-      el.className = 'result ' + (isPass ? 'pass' : 'fail');
-      el.style.display = 'block';
-    }
-
-    // Global function for Plaid Link results (called from index.html handler)
-    window.showPlaidResult = function(message, isPass) {
-      showResult('result-bank', message, isPass);
-    };
-
-    // Test 2: Upgrade to Pro
-    document.getElementById('btn-upgrade-pro')?.addEventListener('click', async () => {
-      const btn = document.getElementById('btn-upgrade-pro');
-      btn.disabled = true;
-      btn.textContent = 'Processing...';
+    console.log('[SMOKE TEST] Script loaded, waiting for DOM...');
+    
+    // Wrap everything in DOMContentLoaded to ensure DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('[SMOKE TEST] DOM ready, attaching event handlers...');
       
-      try {
-        const response = await fetch('/api/stripe/create-checkout-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ 
-            priceId: 'price_pro_monthly',
-            plan: 'pro',
-            interval: 'month'
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to create checkout session: ' + response.statusText);
+      // Utility functions
+      function showResult(elementId, message, isPass) {
+        const el = document.getElementById(elementId);
+        if (!el) {
+          console.error('[SMOKE TEST] Result element not found:', elementId);
+          return;
         }
-        
-        const { url } = await response.json();
-        showResult('result-upgrade', 'Redirecting to Stripe checkout...', true);
-        setTimeout(() => window.location.href = url, 1000);
-      } catch (error) {
-        showResult('result-upgrade', error.message, false);
-        btn.disabled = false;
-        btn.textContent = 'Upgrade to Pro (Monthly)';
+        el.textContent = (isPass ? 'PASS: ' : 'FAIL: ') + message;
+        el.className = 'result ' + (isPass ? 'pass' : 'fail');
+        el.style.display = 'block';
+        console.log('[SMOKE TEST] Result displayed:', { elementId, message, isPass });
       }
-    });
 
-    // Test 3: Logout
-    document.getElementById('btn-logout')?.addEventListener('click', async () => {
-      const btn = document.getElementById('btn-logout');
-      btn.disabled = true;
-      btn.textContent = 'Logging out...';
-      
-      try {
-        showResult('result-logout', 'Redirecting to logout...', true);
-        setTimeout(() => window.location.href = '/api/logout', 500);
-      } catch (error) {
-        showResult('result-logout', error.message, false);
-        btn.disabled = false;
-        btn.textContent = 'Logout';
-      }
-    });
+      // Global function for Plaid Link results (called from index.html handler)
+      window.showPlaidResult = function(message, isPass) {
+        showResult('result-bank', message, isPass);
+      };
 
-    // Test 1: Connect Bank - Plaid Link flow
-    document.getElementById('btn-connect-bank')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget;
-      btn.disabled = true;
-      btn.textContent = 'Connecting...';
-      
-      try {
-        // Fetch link token
-        const linkTokenResponse = await fetch('/api/create_link_token', {
-          credentials: 'include'
-        });
-        
-        if (!linkTokenResponse.ok) {
-          throw new Error('Failed to create link token: ' + linkTokenResponse.statusText);
-        }
-        
-        const { link_token } = await linkTokenResponse.json();
-        
-        // Create and open Plaid Link
-        const handler = window.Plaid.create({
-          token: link_token,
-          onSuccess: async (public_token, metadata) => {
-            try {
-              const exchangeResponse = await fetch('/api/exchange_public_token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ public_token })
-              });
-              
-              if (!exchangeResponse.ok) {
-                throw new Error('Failed to exchange token: ' + exchangeResponse.statusText);
-              }
-              
-              const result = await exchangeResponse.json();
-              showResult('result-bank', 'Bank connected successfully! Connection ID: ' + result.connection.id, true);
-              btn.disabled = false;
-              btn.textContent = 'Connect Bank Account';
-            } catch (error) {
-              showResult('result-bank', error.message, false);
-              btn.disabled = false;
-              btn.textContent = 'Connect Bank Account';
+      // Test 1: Connect Bank - Plaid Link flow
+      const btnConnectBank = document.getElementById('btn-connect-bank');
+      if (btnConnectBank) {
+        console.log('[SMOKE TEST] Attaching handler to Connect Bank button');
+        btnConnectBank.addEventListener('click', async (e) => {
+          console.log('[SMOKE TEST] Connect Bank clicked');
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          btn.textContent = 'Connecting...';
+          
+          try {
+            console.log('[SMOKE TEST] Fetching link token...');
+            // Fetch link token
+            const linkTokenResponse = await fetch('/api/create_link_token', {
+              credentials: 'include'
+            });
+            
+            if (!linkTokenResponse.ok) {
+              throw new Error('Failed to create link token: ' + linkTokenResponse.statusText);
             }
-          },
-          onExit: (err, metadata) => {
+            
+            const { link_token } = await linkTokenResponse.json();
+            console.log('[SMOKE TEST] Link token received, opening Plaid Link...');
+            
+            // Check if Plaid SDK is loaded
+            if (typeof window.Plaid === 'undefined') {
+              throw new Error('Plaid SDK not loaded. Please refresh the page.');
+            }
+            
+            // Create and open Plaid Link
+            const handler = window.Plaid.create({
+              token: link_token,
+              onSuccess: async (public_token, metadata) => {
+                console.log('[SMOKE TEST] Plaid Link success, exchanging token...');
+                try {
+                  const exchangeResponse = await fetch('/api/exchange_public_token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ public_token })
+                  });
+                  
+                  if (!exchangeResponse.ok) {
+                    throw new Error('Failed to exchange token: ' + exchangeResponse.statusText);
+                  }
+                  
+                  const result = await exchangeResponse.json();
+                  showResult('result-bank', 'Bank connected successfully! Connection ID: ' + result.connection.id, true);
+                  btn.disabled = false;
+                  btn.textContent = 'Connect Bank Account';
+                } catch (error) {
+                  console.error('[SMOKE TEST] Exchange error:', error);
+                  showResult('result-bank', error.message, false);
+                  btn.disabled = false;
+                  btn.textContent = 'Connect Bank Account';
+                }
+              },
+              onExit: (err, metadata) => {
+                console.log('[SMOKE TEST] Plaid Link exited', { err, metadata });
+                btn.disabled = false;
+                btn.textContent = 'Connect Bank Account';
+                
+                if (err) {
+                  showResult('result-bank', 'Bank connection cancelled or failed: ' + (err.error_message || err.error_code), false);
+                }
+              }
+            });
+            
+            handler.open();
+            
+          } catch (error) {
+            console.error('[SMOKE TEST] Connect Bank error:', error);
+            showResult('result-bank', error.message, false);
             btn.disabled = false;
             btn.textContent = 'Connect Bank Account';
-            
-            if (err) {
-              showResult('result-bank', 'Bank connection cancelled or failed: ' + (err.error_message || err.error_code), false);
-            }
           }
         });
-        
-        handler.open();
-        
-      } catch (error) {
-        showResult('result-bank', error.message, false);
-        btn.disabled = false;
-        btn.textContent = 'Connect Bank Account';
+      } else {
+        console.error('[SMOKE TEST] Connect Bank button not found!');
       }
-    });
 
-    // Test 4: Login
-    document.getElementById('btn-login')?.addEventListener('click', () => {
-      window.location.href = '/api/login';
+      // Test 2: Upgrade to Pro
+      const btnUpgradePro = document.getElementById('btn-upgrade-pro');
+      if (btnUpgradePro) {
+        console.log('[SMOKE TEST] Attaching handler to Upgrade Pro button');
+        btnUpgradePro.addEventListener('click', async () => {
+          console.log('[SMOKE TEST] Upgrade Pro clicked');
+          const btn = document.getElementById('btn-upgrade-pro');
+          btn.disabled = true;
+          btn.textContent = 'Processing...';
+          
+          try {
+            console.log('[SMOKE TEST] Creating Stripe checkout session...');
+            const response = await fetch('/api/stripe/create-checkout-session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ 
+                priceId: 'price_pro_monthly',
+                plan: 'pro',
+                interval: 'month'
+              })
+            });
+            
+            if (!response.ok) {
+              throw new Error('Failed to create checkout session: ' + response.statusText);
+            }
+            
+            const { url } = await response.json();
+            console.log('[SMOKE TEST] Checkout session created, redirecting...');
+            showResult('result-upgrade', 'Redirecting to Stripe checkout...', true);
+            setTimeout(() => window.location.href = url, 1000);
+          } catch (error) {
+            console.error('[SMOKE TEST] Upgrade error:', error);
+            showResult('result-upgrade', error.message, false);
+            btn.disabled = false;
+            btn.textContent = 'Upgrade to Pro (Monthly)';
+          }
+        });
+      } else {
+        console.error('[SMOKE TEST] Upgrade Pro button not found!');
+      }
+
+      // Test 3: Logout
+      const btnLogout = document.getElementById('btn-logout');
+      if (btnLogout) {
+        console.log('[SMOKE TEST] Attaching handler to Logout button');
+        btnLogout.addEventListener('click', async () => {
+          console.log('[SMOKE TEST] Logout clicked');
+          const btn = document.getElementById('btn-logout');
+          btn.disabled = true;
+          btn.textContent = 'Logging out...';
+          
+          try {
+            showResult('result-logout', 'Redirecting to logout...', true);
+            setTimeout(() => window.location.href = '/api/logout', 500);
+          } catch (error) {
+            console.error('[SMOKE TEST] Logout error:', error);
+            showResult('result-logout', error.message, false);
+            btn.disabled = false;
+            btn.textContent = 'Logout';
+          }
+        });
+      } else {
+        console.error('[SMOKE TEST] Logout button not found!');
+      }
+
+      // Test 4: Login
+      const btnLogin = document.getElementById('btn-login');
+      if (btnLogin) {
+        console.log('[SMOKE TEST] Attaching handler to Login button');
+        btnLogin.addEventListener('click', () => {
+          console.log('[SMOKE TEST] Login clicked');
+          window.location.href = '/api/login';
+        });
+      } else {
+        console.log('[SMOKE TEST] Login button not found (user may already be logged in)');
+      }
+
+      console.log('[SMOKE TEST] All event handlers attached successfully');
     });
   </script>
 </body>
