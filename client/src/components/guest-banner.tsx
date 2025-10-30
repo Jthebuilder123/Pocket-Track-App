@@ -31,10 +31,10 @@ export function GuestBanner() {
             )}
           </p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto sm:flex-shrink-0">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto sm:flex-shrink-0">
           <Button 
             size="default"
-            className="flex-1 sm:flex-none min-h-11 md:min-h-9"
+            className="w-full sm:w-auto min-h-11 md:min-h-9 text-base"
             variant="outline"
             onClick={() => setDismissed(true)}
             data-testid="button-dismiss-banner"
@@ -43,7 +43,7 @@ export function GuestBanner() {
           </Button>
           <Button 
             size="default"
-            className="flex-1 sm:flex-none min-h-11 md:min-h-9"
+            className="w-full sm:w-auto min-h-11 md:min-h-9 text-base"
             onClick={() => window.location.href = "/api/login"}
             data-testid="button-sign-up"
           >
