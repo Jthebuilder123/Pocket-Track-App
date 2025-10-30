@@ -351,13 +351,13 @@ export function DashboardPage() {
               <Button
                 variant="outline"
                 size="icon"
-                className="hidden sm:flex sm:w-auto sm:min-h-9"
+                className="sm:w-auto sm:min-h-9"
                 onClick={() => logoutMutation.mutate()}
                 disabled={logoutMutation.isPending}
                 data-testid="button-logout"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
+                <LogOut className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             ) : (
               <Button

@@ -164,6 +164,7 @@ export function SubscriptionModal({ open, onClose, subscription, template }: Sub
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="max-h-[60vh] overflow-y-auto pr-2 -mr-2 space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -405,6 +406,7 @@ export function SubscriptionModal({ open, onClose, subscription, template }: Sub
                   />
                 </div>
               )}
+            </div>
             </div>
 
             <DialogFooter className="gap-2">
