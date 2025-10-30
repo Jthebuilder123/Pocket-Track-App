@@ -103,6 +103,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       hasSession: !!req.session
     });
     
+    // Add cache-busting headers
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store'
+    });
+    
     res.send(`
 <!DOCTYPE html>
 <html>
@@ -267,30 +275,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ` : ''}
   </div>
 
-  <script>
-    console.log('[SMOKE TEST] Script loaded, waiting for DOM...');
-    
-    // Wrap everything in DOMContentLoaded to ensure DOM is ready
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('[SMOKE TEST] DOM ready, attaching event handlers...');
-      
-      // Utility functions
-      function showResult(elementId, message, isPass) {
-        const el = document.getElementById(elementId);
-        if (!el) {
-          console.error('[SMOKE TEST] Result element not found:', elementId);
-          return;
-        }
-        el.textContent = (isPass ? 'PASS: ' : 'FAIL: ') + message;
-        el.className = 'result ' + (isPass ? 'pass' : 'fail');
-        el.style.display = 'block';
-        console.log('[SMOKE TEST] Result displayed:', { elementId, message, isPass });
-      }
+  <!-- Visible status indicator for debugging -->
+  <div id="debug-status" style="position: fixed; bottom: 10px; right: 10px; background: #1e293b; color: white; padding: 8px 12px; border-radius: 4px; font-size: 11px; font-family: monospace; z-index: 10000;">
+    <div>JS: <span id="js-status" style="color: #fbbf24;">Loading...</span></div>
+    <div>Auth: <span id="auth-status" style="color: #fbbf24;">${isLoggedIn ? 'Logged In' : 'Guest'}</span></div>
+    <div>Handlers: <span id="handlers-status" style="color: #fbbf24;">Pending...</span></div>
+  </div>
 
-      // Global function for Plaid Link results (called from index.html handler)
-      window.showPlaidResult = function(message, isPass) {
-        showResult('result-bank', message, isPass);
-      };
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <script>
+    // Immediate execution - no DOMContentLoaded
+    console.log('[SMOKE TEST] Script executing immediately...');
+    
+    // Update status indicator
+    document.getElementById('js-status').textContent = 'Executing';
+    document.getElementById('js-status').style.color = '#34d399';
+    
+    // Utility functions
+    function showResult(elementId, message, isPass) {
+      const el = document.getElementById(elementId);
+      if (!el) {
+        console.error('[SMOKE TEST] Result element not found:', elementId);
+        return;
+      }
+      el.textContent = (isPass ? 'PASS: ' : 'FAIL: ') + message;
+      el.className = 'result ' + (isPass ? 'pass' : 'fail');
+      el.style.display = 'block';
+      console.log('[SMOKE TEST] Result displayed:', { elementId, message, isPass });
+    }
+
+    // Global function for Plaid Link results (called from index.html handler)
+    window.showPlaidResult = function(message, isPass) {
+      showResult('result-bank', message, isPass);
+    };
+    
+    // Attach handlers immediately (no DOMContentLoaded needed since script is at bottom)
+    function attachHandlers() {
+      console.log('[SMOKE TEST] Attaching event handlers...');
 
       // Test 1: Connect Bank - Plaid Link flow
       const btnConnectBank = document.getElementById('btn-connect-bank');
@@ -452,7 +473,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log('[SMOKE TEST] All event handlers attached successfully');
-    });
+      
+      // Update status indicator
+      document.getElementById('handlers-status').textContent = 'Attached ✓';
+      document.getElementById('handlers-status').style.color = '#34d399';
+    }
+    
+    // Call immediately - script is at bottom so DOM is ready
+    attachHandlers();
+    console.log('[SMOKE TEST] Initialization complete');
   </script>
 </body>
 </html>
