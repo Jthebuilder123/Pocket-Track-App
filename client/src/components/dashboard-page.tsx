@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText, LogOut, LogIn, User, Upload, Crown } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -261,12 +261,16 @@ export function DashboardPage() {
       {/* Header */}
       <header className="border-b bg-background sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
-          <Link href="/" data-testid="link-logo">
-            <div className="flex items-center gap-2 sm:gap-3 cursor-pointer hover-elevate active-elevate-2 px-1.5 sm:px-2 py-1 rounded-md">
-              <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-              <h1 className="text-lg sm:text-xl font-semibold">PocketTrack</h1>
-            </div>
-          </Link>
+          <button 
+            type="button"
+            onClick={() => setLocation("/")}
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer hover-elevate active-elevate-2 px-1.5 sm:px-2 py-1 rounded-md bg-transparent border-0"
+            data-testid="link-logo"
+            aria-label="Go to homepage"
+          >
+            <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+            <h1 className="text-lg sm:text-xl font-semibold">PocketTrack</h1>
+          </button>
           <div className="flex items-center gap-1.5 sm:gap-2">
             {user && (
               <div className="hidden lg:flex items-center gap-3 mr-2">
