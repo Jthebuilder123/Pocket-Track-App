@@ -53,6 +53,125 @@
         });
       }
     </script>
+    
+    <!-- Plaid Link SDK -->
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+    
+    <!-- Plaid Link Event Handler -->
+    <script>
+      // FIX: Vanilla JS event delegation for Connect Bank button
+      // Prevents overlay blocking and ensures reliable click handling
+      document.addEventListener('click', async (e) => {
+        const el = e.target.closest('[data-action="connect-bank"]');
+        if (!el) return;
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('[PLAID-LINK] Connect Bank button clicked');
+        
+        // Disable button during processing
+        el.disabled = true;
+        
+        // Preserve icon and update text only
+        const textSpan = el.querySelector('span');
+        const originalText = textSpan ? textSpan.textContent : el.textContent;
+        if (textSpan) {
+          textSpan.textContent = 'Connecting...';
+        } else {
+          el.textContent = 'Connecting...';
+        }
+        
+        try {
+          // Fetch link token from backend
+          console.log('[PLAID-LINK] Fetching link token...');
+          const linkTokenResponse = await fetch('/api/create_link_token', {
+            credentials: 'include'
+          });
+          
+          if (!linkTokenResponse.ok) {
+            throw new Error('Failed to create link token: ' + linkTokenResponse.statusText);
+          }
+          
+          const { link_token } = await linkTokenResponse.json();
+          console.log('[PLAID-LINK] Link token received');
+          
+          // Create and open Plaid Link
+          const handler = window.Plaid.create({
+            token: link_token,
+            onSuccess: async (public_token, metadata) => {
+              console.log('[PLAID-LINK] Plaid Link success, exchanging token...');
+              
+              try {
+                const exchangeResponse = await fetch('/api/exchange_public_token', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ public_token })
+                });
+                
+                if (!exchangeResponse.ok) {
+                  throw new Error('Failed to exchange token: ' + exchangeResponse.statusText);
+                }
+                
+                const result = await exchangeResponse.json();
+                console.log('[PLAID-LINK] Token exchanged successfully', result);
+                
+                // Trigger success callback if on smoke test page
+                if (window.showPlaidResult) {
+                  window.showPlaidResult('PASS: Bank connected successfully', true);
+                }
+                
+                // Redirect to dashboard to show connected bank
+                setTimeout(() => window.location.href = '/', 1000);
+              } catch (error) {
+                console.error('[PLAID-LINK] Error exchanging token:', error);
+                if (window.showPlaidResult) {
+                  window.showPlaidResult('FAIL: ' + error.message, false);
+                } else {
+                  alert('Failed to connect bank. Please try again.');
+                }
+                el.disabled = false;
+                if (textSpan) textSpan.textContent = originalText;
+                else el.textContent = originalText;
+              }
+            },
+            onExit: (err, metadata) => {
+              console.log('[PLAID-LINK] Plaid Link exited', { err, metadata });
+              el.disabled = false;
+              if (textSpan) textSpan.textContent = originalText;
+              else el.textContent = originalText;
+              
+              if (err) {
+                console.error('[PLAID-LINK] Plaid Link error:', err);
+                if (window.showPlaidResult) {
+                  window.showPlaidResult('FAIL: Bank connection cancelled or failed', false);
+                } else {
+                  alert('Bank connection cancelled or failed.');
+                }
+              }
+            },
+            onEvent: (eventName, metadata) => {
+              console.log('[PLAID-LINK] Plaid Link event:', eventName, metadata);
+            }
+          });
+          
+          console.log('[PLAID-LINK] Opening Plaid Link modal...');
+          handler.open();
+          
+        } catch (error) {
+          console.error('[PLAID-LINK] Error in Connect Bank flow:', error);
+          if (window.showPlaidResult) {
+            window.showPlaidResult('FAIL: ' + error.message, false);
+          } else {
+            alert('Failed to connect bank. Please try again.');
+          }
+          el.disabled = false;
+          if (textSpan) textSpan.textContent = originalText;
+          else el.textContent = originalText;
+        }
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

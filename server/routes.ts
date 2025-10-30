@@ -87,6 +87,296 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Smoke test page for manual testing of critical features
+  app.get("/debug/smoke", async (req: any, res) => {
+    const isLoggedIn = !!req.user;
+    const userEmail = isLoggedIn ? req.user.claims.email : null;
+    
+    res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PocketTrack - Smoke Tests</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 { color: #0f172a; margin-bottom: 10px; }
+    .subtitle { color: #64748b; margin-bottom: 30px; font-size: 14px; }
+    .status { 
+      padding: 12px 20px; 
+      border-radius: 6px; 
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+    .status.info { background: #dbeafe; color: #1e40af; }
+    .status.success { background: #dcfce7; color: #166534; }
+    .status.error { background: #fee2e2; color: #991b1b; }
+    .test-section {
+      background: #f8fafc;
+      padding: 20px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      border: 1px solid #e2e8f0;
+    }
+    .test-section h2 {
+      font-size: 16px;
+      margin-bottom: 10px;
+      color: #1e293b;
+    }
+    .test-section p {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 15px;
+    }
+    button {
+      background: #0f172a;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      transition: background 0.2s;
+    }
+    button:hover:not(:disabled) { background: #1e293b; }
+    button:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background: #64748b;
+    }
+    button.secondary:hover:not(:disabled) {
+      background: #475569;
+    }
+    .result {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: 'Courier New', monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .result.pass { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .result.fail { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 PocketTrack Smoke Tests</h1>
+    <p class="subtitle">Manual testing interface for critical features</p>
+    
+    <div class="status ${isLoggedIn ? 'success' : 'info'}">
+      ${isLoggedIn 
+        ? `✓ Logged in as: <strong>${userEmail}</strong>`
+        : '⚠ Not logged in - some tests will be unavailable'}
+    </div>
+
+    <!-- Test 1: Connect Bank (Plaid Link) -->
+    <div class="test-section">
+      <h2>1. Connect Bank (Plaid Link)</h2>
+      <p>Tests the complete Plaid Link flow: create link token → open modal → exchange public token → save connection</p>
+      <button 
+        id="btn-connect-bank" 
+        data-action="connect-bank"
+        ${!isLoggedIn ? 'disabled title="Login required"' : ''}
+      >
+        ${isLoggedIn ? 'Connect Bank Account' : 'Login Required'}
+      </button>
+      <div id="result-bank" class="result" style="display:none"></div>
+    </div>
+
+    <!-- Test 2: Upgrade to Pro (Stripe Checkout) -->
+    <div class="test-section">
+      <h2>2. Upgrade to Pro Plan (Monthly)</h2>
+      <p>Tests Stripe checkout flow for Pro plan monthly subscription ($19.99/month)</p>
+      <button 
+        id="btn-upgrade-pro" 
+        ${!isLoggedIn ? 'disabled title="Login required"' : ''}
+      >
+        ${isLoggedIn ? 'Upgrade to Pro (Monthly)' : 'Login Required'}
+      </button>
+      <div id="result-upgrade" class="result" style="display:none"></div>
+    </div>
+
+    <!-- Test 3: Logout -->
+    <div class="test-section">
+      <h2>3. Logout</h2>
+      <p>Tests the logout flow and session termination</p>
+      <button 
+        id="btn-logout" 
+        class="secondary"
+        ${!isLoggedIn ? 'disabled title="Already logged out"' : ''}
+      >
+        ${isLoggedIn ? 'Logout' : 'Already Logged Out'}
+      </button>
+      <div id="result-logout" class="result" style="display:none"></div>
+    </div>
+
+    <!-- Test 4: Login -->
+    ${!isLoggedIn ? `
+    <div class="test-section">
+      <h2>4. Login</h2>
+      <p>Click to start the login flow (required for other tests)</p>
+      <button id="btn-login">Go to Login</button>
+    </div>
+    ` : ''}
+  </div>
+
+  <script>
+    // Utility functions
+    function showResult(elementId, message, isPass) {
+      const el = document.getElementById(elementId);
+      el.textContent = (isPass ? 'PASS: ' : 'FAIL: ') + message;
+      el.className = 'result ' + (isPass ? 'pass' : 'fail');
+      el.style.display = 'block';
+    }
+
+    // Global function for Plaid Link results (called from index.html handler)
+    window.showPlaidResult = function(message, isPass) {
+      showResult('result-bank', message, isPass);
+    };
+
+    // Test 2: Upgrade to Pro
+    document.getElementById('btn-upgrade-pro')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-upgrade-pro');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+      
+      try {
+        const response = await fetch('/api/stripe/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ 
+            priceId: 'price_pro_monthly',
+            plan: 'pro',
+            interval: 'month'
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to create checkout session: ' + response.statusText);
+        }
+        
+        const { url } = await response.json();
+        showResult('result-upgrade', 'Redirecting to Stripe checkout...', true);
+        setTimeout(() => window.location.href = url, 1000);
+      } catch (error) {
+        showResult('result-upgrade', error.message, false);
+        btn.disabled = false;
+        btn.textContent = 'Upgrade to Pro (Monthly)';
+      }
+    });
+
+    // Test 3: Logout
+    document.getElementById('btn-logout')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btn-logout');
+      btn.disabled = true;
+      btn.textContent = 'Logging out...';
+      
+      try {
+        showResult('result-logout', 'Redirecting to logout...', true);
+        setTimeout(() => window.location.href = '/api/logout', 500);
+      } catch (error) {
+        showResult('result-logout', error.message, false);
+        btn.disabled = false;
+        btn.textContent = 'Logout';
+      }
+    });
+
+    // Test 1: Connect Bank - Plaid Link flow
+    document.getElementById('btn-connect-bank')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+      
+      try {
+        // Fetch link token
+        const linkTokenResponse = await fetch('/api/create_link_token', {
+          credentials: 'include'
+        });
+        
+        if (!linkTokenResponse.ok) {
+          throw new Error('Failed to create link token: ' + linkTokenResponse.statusText);
+        }
+        
+        const { link_token } = await linkTokenResponse.json();
+        
+        // Create and open Plaid Link
+        const handler = window.Plaid.create({
+          token: link_token,
+          onSuccess: async (public_token, metadata) => {
+            try {
+              const exchangeResponse = await fetch('/api/exchange_public_token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ public_token })
+              });
+              
+              if (!exchangeResponse.ok) {
+                throw new Error('Failed to exchange token: ' + exchangeResponse.statusText);
+              }
+              
+              const result = await exchangeResponse.json();
+              showResult('result-bank', 'Bank connected successfully! Connection ID: ' + result.connection.id, true);
+              btn.disabled = false;
+              btn.textContent = 'Connect Bank Account';
+            } catch (error) {
+              showResult('result-bank', error.message, false);
+              btn.disabled = false;
+              btn.textContent = 'Connect Bank Account';
+            }
+          },
+          onExit: (err, metadata) => {
+            btn.disabled = false;
+            btn.textContent = 'Connect Bank Account';
+            
+            if (err) {
+              showResult('result-bank', 'Bank connection cancelled or failed: ' + (err.error_message || err.error_code), false);
+            }
+          }
+        });
+        
+        handler.open();
+        
+      } catch (error) {
+        showResult('result-bank', error.message, false);
+        btn.disabled = false;
+        btn.textContent = 'Connect Bank Account';
+      }
+    });
+
+    // Test 4: Login
+    document.getElementById('btn-login')?.addEventListener('click', () => {
+      window.location.href = '/api/login';
+    });
+  </script>
+</body>
+</html>
+    `);
+  });
+
   // ===== Authentication Routes =====
   // Auth routes are now handled by setupAuth() (Google OAuth + Email/Password via Replit Auth)
   // Available routes:
@@ -709,7 +999,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== Plaid Bank Integration Routes =====
 
-  // Create Plaid Link token
+  // GET /api/create_link_token - Simplified route for vanilla JS frontend (no CSRF needed for GET)
+  app.get("/api/create_link_token", requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.user!.claims.sub || "demo-user-123"; // Fallback for testing
+      logger.info("[PLAID] Creating link token", { userId: userId.substring(0, 8) + "..." });
+      const linkToken = await createLinkToken(userId);
+      logger.info("[PLAID] Link token created successfully");
+      res.json({ link_token: linkToken });
+    } catch (error: any) {
+      logger.error("[PLAID] Error creating link token", { 
+        error: error.message,
+        stack: error.stack?.split('\n')[0] 
+      });
+      if (error.message && error.message.includes('Plaid is not configured')) {
+        return res.status(503).json({ 
+          error: "Bank connections are not configured. Please add PLAID_CLIENT_ID and PLAID_SECRET to your deployment environment variables." 
+        });
+      }
+      res.status(500).json({ error: "Failed to create link token" });
+    }
+  });
+
+  // POST /api/exchange_public_token - Simplified route for vanilla JS frontend
+  app.post("/api/exchange_public_token", requireAuth, checkBankConnectionLimit, async (req: any, res: any) => {
+    try {
+      const userId = req.user!.claims.sub;
+      const { public_token } = req.body;
+      
+      if (!public_token) {
+        logger.warn("[PLAID] Missing public_token in request");
+        return res.status(400).json({ error: "Missing public_token" });
+      }
+
+      logger.info("[PLAID] Exchanging public token", { userId: userId.substring(0, 8) + "..." });
+      
+      // Exchange public token for access token
+      const { accessToken, itemId } = await exchangePublicToken(public_token);
+      logger.info("[PLAID] Public token exchanged successfully", { itemId });
+      
+      // Fetch institution and account details from Plaid API
+      const accountsData = await getAccounts(accessToken);
+      const accounts = accountsData.map(acc => ({ id: acc.account_id, name: acc.name }));
+      
+      // Get institution details
+      let institutionId = 'unknown';
+      let institutionName = 'Unknown Bank';
+      
+      if (accountsData.length > 0) {
+        const itemResponse = await plaidClient.itemGet({ access_token: accessToken });
+        institutionId = itemResponse.data.item.institution_id || 'unknown';
+        
+        if (institutionId && institutionId !== 'unknown') {
+          const institutionData = await getInstitution(institutionId);
+          institutionName = institutionData.name;
+        }
+      }
+      
+      logger.info("[PLAID] Saving bank connection", { institutionName, accountCount: accounts.length });
+      
+      // Save bank connection (access token is encrypted in storage)
+      const connection = await storage.createBankConnection({
+        userId,
+        institutionId,
+        institutionName,
+        accessToken,
+        itemId,
+        accountIds: accounts.map(a => a.id),
+        lastSyncedAt: null,
+      });
+      
+      logger.info("[PLAID] Bank connection saved successfully", { connectionId: connection.id });
+      res.json({ status: "ok", connection });
+    } catch (error: any) {
+      logger.error("[PLAID] Error exchanging token", { 
+        error: error.message,
+        stack: error.stack?.split('\n')[0]
+      });
+      res.status(500).json({ error: "Failed to exchange token" });
+    }
+  });
+
+  // POST /api/plaid/webhook - Plaid webhook handler
+  app.post("/api/plaid/webhook", async (req, res) => {
+    try {
+      const webhookType = req.body.webhook_type;
+      const webhookCode = req.body.webhook_code;
+      const itemId = req.body.item_id;
+      
+      logger.info("[PLAID WEBHOOK] Received", { 
+        type: webhookType, 
+        code: webhookCode,
+        itemId 
+      });
+      
+      // Handle different webhook types
+      if (webhookType === 'TRANSACTIONS') {
+        logger.info("[PLAID WEBHOOK] Transaction webhook - sync required", { itemId });
+        // Future: trigger background sync for this item
+      } else if (webhookType === 'ITEM') {
+        if (webhookCode === 'ERROR') {
+          logger.error("[PLAID WEBHOOK] Item error", { 
+            error: req.body.error,
+            itemId 
+          });
+        } else {
+          logger.info("[PLAID WEBHOOK] Item update", { code: webhookCode, itemId });
+        }
+      }
+      
+      // Always return 200 to acknowledge receipt
+      res.status(200).json({ status: "received" });
+    } catch (error: any) {
+      logger.error("[PLAID WEBHOOK] Error processing webhook", { 
+        error: error.message 
+      });
+      // Still return 200 to prevent Plaid from retrying
+      res.status(200).json({ status: "error" });
+    }
+  });
+
+  // Create Plaid Link token (existing route - keep for backwards compatibility)
   app.post("/api/plaid/create-link-token", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;

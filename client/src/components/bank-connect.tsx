@@ -1,5 +1,3 @@
-import { useState, useCallback, useEffect } from "react";
-import { usePlaidLink } from "react-plaid-link";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Building2, RefreshCw, Unplug, AlertCircle, LogIn, Lock, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -71,126 +69,16 @@ function getErrorMessage(error: any): { message: string; isLimitError: boolean }
 }
 
 export function BankConnect() {
-  console.log("[BANK-CONNECT] === BankConnect component rendering ===");
-  
-  const [linkToken, setLinkToken] = useState<string | null>(null);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   // Check authentication status
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const isGuest = !isAuthenticated;
-  
-  console.log("[BANK-CONNECT] Component state:", { 
-    isAuthenticated, 
-    authLoading, 
-    isGuest,
-    linkToken: !!linkToken 
-  });
 
   const { data: connections = [], isLoading } = useQuery<BankConnection[]>({
     queryKey: ["/api/bank-connections"],
     enabled: !isGuest, // Only fetch if authenticated
-  });
-  
-  console.log("[BANK-CONNECT] Connections query:", { 
-    connectionsCount: connections.length, 
-    isLoading 
-  });
-
-  // Component mount logging
-  useEffect(() => {
-    console.log("[BANK-CONNECT] *** Component MOUNTED ***");
-    return () => {
-      console.log("[BANK-CONNECT] *** Component UNMOUNTED ***");
-    };
-  }, []);
-
-  // Track linkToken changes
-  useEffect(() => {
-    console.log("[BANK-CONNECT] linkToken changed:", linkToken ? "Token exists" : "No token");
-  }, [linkToken]);
-
-  // Create link token mutation
-  const createLinkTokenMutation = useMutation({
-    mutationFn: async () => {
-      console.log("[BANK-CONNECT] API call: Creating Plaid link token...");
-      try {
-        const response = await apiRequest("POST", "/api/plaid/create-link-token");
-        const data = await response.json();
-        console.log("[BANK-CONNECT] Link token created successfully");
-        return data;
-      } catch (error) {
-        console.error("[BANK-CONNECT] API error creating link token:", error);
-        throw error;
-      }
-    },
-    onSuccess: (data) => {
-      console.log("[BANK-CONNECT] Mutation success: Link token received");
-      setLinkToken(data.link_token);
-    },
-    onError: (error) => {
-      console.error("[BANK-CONNECT] Mutation error: Link token creation failed", error);
-      const { message, isLimitError } = getErrorMessage(error);
-      console.log("[BANK-CONNECT] Parsed error:", { message, isLimitError });
-      toast({
-        title: isLimitError ? "Plan Limit Reached" : "Connection Failed",
-        description: message,
-        variant: "destructive",
-        action: isLimitError ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setLocation("/pricing")}
-            data-testid="button-upgrade-toast"
-          >
-            <Crown className="w-4 h-4 mr-1" />
-            Upgrade
-          </Button>
-        ) : undefined,
-      });
-    },
-  });
-
-  // Exchange public token mutation
-  const exchangeTokenMutation = useMutation({
-    mutationFn: async (data: { 
-      public_token: string; 
-      institution_id?: string; 
-      institution_name?: string; 
-      accounts?: Array<{ id: string; name: string }> 
-    }) => {
-      const response = await apiRequest("POST", "/api/plaid/exchange-token", data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-connections"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/detected-subscriptions"] });
-      setLinkToken(null);
-      toast({
-        title: "Bank Connected",
-        description: "Successfully connected your bank account",
-      });
-    },
-    onError: (error) => {
-      const { message, isLimitError } = getErrorMessage(error);
-      toast({
-        title: isLimitError ? "Plan Limit Reached" : "Connection Failed",
-        description: message,
-        variant: "destructive",
-        action: isLimitError ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setLocation("/pricing")}
-            data-testid="button-upgrade-toast"
-          >
-            <Crown className="w-4 h-4 mr-1" />
-            Upgrade
-          </Button>
-        ) : undefined,
-      });
-    },
   });
 
   // Sync transactions mutation
@@ -239,88 +127,6 @@ export function BankConnect() {
     },
   });
 
-  const onSuccess = useCallback((publicToken: string, metadata: any) => {
-    const payload: {
-      public_token: string;
-      institution_id?: string;
-      institution_name?: string;
-      accounts?: Array<{ id: string; name: string }>;
-    } = {
-      public_token: publicToken,
-    };
-
-    // Add metadata only if available
-    if (metadata?.institution?.institution_id) {
-      payload.institution_id = metadata.institution.institution_id;
-    }
-    if (metadata?.institution?.name) {
-      payload.institution_name = metadata.institution.name;
-    }
-    if (metadata?.accounts && metadata.accounts.length > 0) {
-      payload.accounts = metadata.accounts;
-    }
-
-    exchangeTokenMutation.mutate(payload);
-  }, [exchangeTokenMutation]);
-
-  const config = {
-    token: linkToken,
-    onSuccess,
-  };
-
-  console.log("[BANK-CONNECT] Plaid config created:", { hasToken: !!linkToken });
-
-  let plaidLinkResult;
-  try {
-    plaidLinkResult = usePlaidLink(config);
-    console.log("[BANK-CONNECT] usePlaidLink successful:", { 
-      ready: plaidLinkResult.ready,
-      hasOpen: !!plaidLinkResult.open 
-    });
-  } catch (error) {
-    console.error("[BANK-CONNECT] ERROR in usePlaidLink:", error);
-    throw error;
-  }
-
-  const { open, ready } = plaidLinkResult;
-
-  const handleConnect = () => {
-    console.log("[BANK-CONNECT] ====== BUTTON CLICKED ======");
-    try {
-      // Always log button clicks for debugging
-      console.log("[BANK-CONNECT] Handler executing...");
-      console.log("[BANK-CONNECT] isGuest:", isGuest);
-      console.log("[BANK-CONNECT] linkToken exists:", !!linkToken);
-      console.log("[BANK-CONNECT] Plaid Link ready:", ready);
-      console.log("[BANK-CONNECT] createLinkToken pending:", createLinkTokenMutation.isPending);
-      console.log("[BANK-CONNECT] exchangeToken pending:", exchangeTokenMutation.isPending);
-      
-      if (DEBUG_BANK_CONNECT) {
-        console.log("[DEBUG] Full linkToken:", linkToken);
-        console.log("[DEBUG] Plaid config:", config);
-      }
-      
-      if (linkToken && ready) {
-        console.log("[BANK-CONNECT] Opening Plaid Link modal...");
-        open();
-      } else {
-        console.log("[BANK-CONNECT] Creating link token...");
-        createLinkTokenMutation.mutate();
-      }
-    } catch (error) {
-      console.error("[BANK-CONNECT] ERROR in handleConnect:", error);
-      toast({
-        title: "Connection Error",
-        description: "An unexpected error occurred. Please check the console for details.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Auto-open Plaid Link when token is ready
-  if (linkToken && ready && !createLinkTokenMutation.isPending) {
-    open();
-  }
 
   // Show guest mode UI if not authenticated
   if (isGuest) {
@@ -383,10 +189,7 @@ export function BankConnect() {
     );
   }
 
-  // Authenticated user UI
-  console.log("[BANK-CONNECT] Rendering authenticated UI with Connect Bank button");
-  console.log("[BANK-CONNECT] Button will be disabled:", createLinkTokenMutation.isPending || exchangeTokenMutation.isPending);
-  
+  // Authenticated user UI - Bank connection handled by vanilla JS in index.html
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -397,19 +200,11 @@ export function BankConnect() {
           </p>
         </div>
         <Button
-          onClick={() => {
-            console.log("[BANK-CONNECT] >>>>>> onClick wrapper fired <<<<<<");
-            handleConnect();
-          }}
-          disabled={createLinkTokenMutation.isPending || exchangeTokenMutation.isPending}
           data-testid="button-connect-bank"
+          data-action="connect-bank"
         >
           <Building2 className="w-4 h-4 mr-2" />
-          {createLinkTokenMutation.isPending 
-            ? "Connecting..." 
-            : exchangeTokenMutation.isPending 
-            ? "Processing..."
-            : "Connect Bank"}
+          <span>Connect Bank</span>
         </Button>
       </div>
 
