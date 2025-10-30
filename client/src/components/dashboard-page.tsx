@@ -260,16 +260,16 @@ export function DashboardPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-background sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
           <Link href="/" data-testid="link-logo">
-            <div className="flex items-center gap-3 cursor-pointer hover-elevate active-elevate-2 px-2 py-1 rounded-md">
-              <CreditCard className="w-6 h-6 text-primary" />
-              <h1 className="text-xl font-semibold">PocketTrack</h1>
+            <div className="flex items-center gap-2 sm:gap-3 cursor-pointer hover-elevate active-elevate-2 px-1.5 sm:px-2 py-1 rounded-md">
+              <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              <h1 className="text-lg sm:text-xl font-semibold">PocketTrack</h1>
             </div>
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {user && (
-              <div className="flex items-center gap-3 mr-2">
+              <div className="hidden lg:flex items-center gap-3 mr-2">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground" data-testid="text-user-email">
@@ -290,17 +290,19 @@ export function DashboardPage() {
             )}
             <Button
               variant="outline"
+              size="icon"
+              className="sm:w-auto sm:min-h-9"
               onClick={() => setLocation("/pricing")}
               data-testid="button-pricing"
             >
-              <Crown className="w-4 h-4 mr-2" />
-              Upgrade
+              <Crown className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Upgrade</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="default" data-testid="button-export">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
+                <Button variant="outline" size="icon" className="sm:w-auto sm:min-h-9" data-testid="button-export">
+                  <Download className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Export</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -316,9 +318,9 @@ export function DashboardPage() {
             </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" data-testid="button-import">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Import
+                <Button variant="outline" size="icon" className="sm:w-auto sm:min-h-9" data-testid="button-import">
+                  <Upload className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Import</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -332,13 +334,20 @@ export function DashboardPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button onClick={handleAddNew} data-testid="button-add-subscription">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Subscription
+            <Button 
+              onClick={handleAddNew} 
+              size="icon"
+              className="sm:w-auto sm:min-h-9"
+              data-testid="button-add-subscription"
+            >
+              <Plus className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Subscription</span>
             </Button>
             {user ? (
               <Button
                 variant="outline"
+                size="icon"
+                className="hidden sm:flex sm:w-auto sm:min-h-9"
                 onClick={() => logoutMutation.mutate()}
                 disabled={logoutMutation.isPending}
                 data-testid="button-logout"
@@ -349,11 +358,13 @@ export function DashboardPage() {
             ) : (
               <Button
                 variant="default"
+                size="icon"
+                className="sm:w-auto sm:min-h-9"
                 onClick={() => setLocation("/login")}
                 data-testid="button-login"
               >
-                <LogIn className="w-4 h-4 mr-2" />
-                Login
+                <LogIn className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Login</span>
               </Button>
             )}
           </div>
@@ -361,64 +372,64 @@ export function DashboardPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
         {/* Guest Banner */}
         {isGuest && (
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <GuestBanner />
           </div>
         )}
 
         {/* Page Header */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-semibold mb-2">Dashboard</h2>
-          <p className="text-sm text-muted-foreground">
+        <div className="mb-6 sm:mb-8">
+          <h2 className="text-2xl sm:text-3xl font-semibold mb-1.5 sm:mb-2">Dashboard</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Track and manage all your recurring subscriptions
           </p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card className="hover-elevate transition-all" data-testid="card-monthly-total">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <p className="text-sm font-medium text-muted-foreground">Monthly Total</p>
-              <DollarSign className="w-4 h-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 sm:pb-2">
+              <p className="text-sm sm:text-sm font-medium text-muted-foreground">Monthly Total</p>
+              <DollarSign className="w-5 h-5 sm:w-4 sm:h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-monthly-amount">
+              <div className="text-4xl sm:text-3xl font-bold" data-testid="text-monthly-amount">
                 ${monthlyTotal.toFixed(2)}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-sm sm:text-xs text-muted-foreground mt-1.5 sm:mt-1">
                 Estimated monthly spending
               </p>
             </CardContent>
           </Card>
 
           <Card className="hover-elevate transition-all" data-testid="card-annual-total">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <p className="text-sm font-medium text-muted-foreground">Annual Total</p>
-              <TrendingUp className="w-4 h-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 sm:pb-2">
+              <p className="text-sm sm:text-sm font-medium text-muted-foreground">Annual Total</p>
+              <TrendingUp className="w-5 h-5 sm:w-4 sm:h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-annual-amount">
+              <div className="text-4xl sm:text-3xl font-bold" data-testid="text-annual-amount">
                 ${annualTotal.toFixed(2)}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-sm sm:text-xs text-muted-foreground mt-1.5 sm:mt-1">
                 Projected yearly spending
               </p>
             </CardContent>
           </Card>
 
           <Card className="hover-elevate transition-all" data-testid="card-active-count">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <p className="text-sm font-medium text-muted-foreground">Active Subscriptions</p>
-              <Calendar className="w-4 h-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 sm:pb-2">
+              <p className="text-sm sm:text-sm font-medium text-muted-foreground">Active Subscriptions</p>
+              <Calendar className="w-5 h-5 sm:w-4 sm:h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-subscription-count">
+              <div className="text-4xl sm:text-3xl font-bold" data-testid="text-subscription-count">
                 {activeCount}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-sm sm:text-xs text-muted-foreground mt-1.5 sm:mt-1">
                 Currently tracked
               </p>
             </CardContent>
@@ -426,18 +437,18 @@ export function DashboardPage() {
         </div>
 
         {/* Tabs for different sections */}
-        <Tabs defaultValue="subscriptions" className="mb-8">
-          <TabsList data-testid="tabs-navigation">
-            <TabsTrigger value="subscriptions" data-testid="tab-subscriptions">
+        <Tabs defaultValue="subscriptions" className="mb-6 sm:mb-8">
+          <TabsList className="w-full grid grid-cols-2 sm:grid-cols-4 h-auto sm:h-10" data-testid="tabs-navigation">
+            <TabsTrigger value="subscriptions" className="text-xs sm:text-sm min-h-10 sm:min-h-9" data-testid="tab-subscriptions">
               My Subscriptions
             </TabsTrigger>
-            <TabsTrigger value="templates" data-testid="tab-templates">
+            <TabsTrigger value="templates" className="text-xs sm:text-sm min-h-10 sm:min-h-9" data-testid="tab-templates">
               Browse Templates
             </TabsTrigger>
-            <TabsTrigger value="detected" data-testid="tab-detected">
+            <TabsTrigger value="detected" className="text-xs sm:text-sm min-h-10 sm:min-h-9" data-testid="tab-detected">
               Detected
             </TabsTrigger>
-            <TabsTrigger value="banks" data-testid="tab-banks">
+            <TabsTrigger value="banks" className="text-xs sm:text-sm min-h-10 sm:min-h-9" data-testid="tab-banks">
               Bank Connections
             </TabsTrigger>
           </TabsList>
@@ -455,21 +466,21 @@ export function DashboardPage() {
             )}
 
             {/* Filters and Search */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        <div className="mb-6 flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 sm:w-4 sm:h-4 text-muted-foreground" />
             <Input
               placeholder="Search subscriptions..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-10 sm:pl-9 min-h-11 sm:min-h-9 text-base sm:text-sm"
               data-testid="input-search"
             />
           </div>
           <div className="flex gap-2 flex-wrap sm:flex-nowrap">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-category-filter">
-                <SlidersHorizontal className="w-4 h-4 mr-2" />
+              <SelectTrigger className="w-full sm:w-[180px] min-h-11 sm:min-h-9 text-base sm:text-sm" data-testid="select-category-filter">
+                <SlidersHorizontal className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>

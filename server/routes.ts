@@ -1056,6 +1056,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/user/sync-plan - Manually sync user's plan from Stripe
+  app.post("/api/user/sync-plan", requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.user!.claims.sub;
+      logger.info("Manual plan sync requested", { userId });
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        logger.error("User not found for plan sync", { userId });
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // If user has no Stripe customer ID, they haven't made any purchases
+      if (!user.stripeCustomerId) {
+        logger.info("User has no Stripe customer ID, keeping free plan", { userId });
+        return res.json({
+          plan: user.plan,
+          synced: false,
+          message: "No payment history found. You are on the free plan.",
+        });
+      }
+
+      logger.info("Fetching Stripe subscriptions for customer", {
+        userId,
+        customerId: user.stripeCustomerId,
+      });
+
+      // Fetch active subscriptions from Stripe
+      const subscriptions = await stripe.subscriptions.list({
+        customer: user.stripeCustomerId,
+        status: "active",
+        limit: 10,
+      });
+
+      logger.info("Stripe subscriptions fetched", {
+        userId,
+        customerId: user.stripeCustomerId,
+        count: subscriptions.data.length,
+      });
+
+      // Find the highest tier active subscription
+      let newPlan = "free";
+      let subscriptionId = null;
+
+      for (const subscription of subscriptions.data) {
+        // Check metadata for plan information
+        const planId = subscription.metadata.planId;
+        logger.info("Checking subscription", {
+          userId,
+          subscriptionId: subscription.id,
+          planId,
+          metadata: subscription.metadata,
+        });
+
+        if (planId === PRICING_TIERS.PRO) {
+          newPlan = PRICING_TIERS.PRO;
+          subscriptionId = subscription.id;
+          break; // Pro is the highest, no need to check further
+        } else if (planId === PRICING_TIERS.ESSENTIALS && newPlan === "free") {
+          newPlan = PRICING_TIERS.ESSENTIALS;
+          subscriptionId = subscription.id;
+        }
+      }
+
+      logger.info("Determined plan from Stripe subscriptions", {
+        userId,
+        currentPlan: user.plan,
+        newPlan,
+        subscriptionId,
+      });
+
+      // Update user's plan if it changed
+      if (newPlan !== user.plan || subscriptionId !== user.stripeSubscriptionId) {
+        logger.info("Updating user plan", {
+          userId,
+          oldPlan: user.plan,
+          newPlan,
+          subscriptionId,
+        });
+
+        await storage.updateUserPlan(userId, newPlan);
+        if (subscriptionId) {
+          await storage.updateUserStripeInfo(
+            userId,
+            user.stripeCustomerId,
+            subscriptionId
+          );
+        }
+
+        logger.info("User plan synced successfully", {
+          userId,
+          plan: newPlan,
+        });
+
+        return res.json({
+          plan: newPlan,
+          synced: true,
+          message: `Plan updated to ${newPlan}`,
+          previousPlan: user.plan,
+        });
+      } else {
+        logger.info("User plan already up to date", {
+          userId,
+          plan: newPlan,
+        });
+
+        return res.json({
+          plan: newPlan,
+          synced: false,
+          message: "Plan already up to date",
+        });
+      }
+    } catch (error) {
+      logger.error("Error syncing user plan from Stripe", { error, userId: req.user?.claims?.sub });
+      res.status(500).json({
+        error: "Failed to sync plan",
+        message: "An error occurred while syncing your plan. Please try again or contact support.",
+      });
+    }
+  });
+
   // POST /api/create-checkout-session - Create Stripe Checkout session
   app.post("/api/create-checkout-session", requireAuth, async (req: any, res: any) => {
     try {
@@ -1143,8 +1264,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sig = req.headers["stripe-signature"];
       const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+      logger.info("[STRIPE WEBHOOK] Received webhook request", {
+        hasSignature: !!sig,
+        hasSecret: !!webhookSecret,
+        headers: Object.keys(req.headers),
+      });
+
       if (!sig) {
-        logger.warn("Missing Stripe signature header");
+        logger.warn("[STRIPE WEBHOOK] Missing Stripe signature header");
         return res.status(400).send("Missing signature");
       }
 
@@ -1158,33 +1285,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.on("end", () => resolve(Buffer.concat(chunks)));
         });
 
+        logger.info("[STRIPE WEBHOOK] Raw body received", {
+          bodyLength: rawBody.length,
+        });
+
         if (webhookSecret) {
           event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+          logger.info("[STRIPE WEBHOOK] Signature verified successfully");
         } else {
           // For development without webhook secret
           event = JSON.parse(rawBody.toString());
-          logger.warn("Processing Stripe webhook without signature verification");
+          logger.warn("[STRIPE WEBHOOK] Processing webhook without signature verification (development mode)");
         }
+
+        logger.info("[STRIPE WEBHOOK] Event parsed", {
+          type: event.type,
+          id: event.id,
+          created: event.created,
+        });
       } catch (err: any) {
-        logger.error("Webhook signature verification failed", { error: err.message });
+        logger.error("[STRIPE WEBHOOK] Signature verification failed", {
+          error: err.message,
+          stack: err.stack,
+        });
         return res.status(400).send(`Webhook Error: ${err.message}`);
       }
 
       // Handle the event
       try {
+        logger.info("[STRIPE WEBHOOK] Processing event", {
+          eventType: event.type,
+          eventId: event.id,
+        });
+
         switch (event.type) {
           case "checkout.session.completed": {
             const session = event.data.object as Stripe.Checkout.Session;
             const userId = session.metadata?.userId;
             const planId = session.metadata?.planId;
 
-            logger.info("Webhook received: checkout.session.completed", {
+            logger.info("[STRIPE WEBHOOK] checkout.session.completed received", {
               userId,
               planId,
               customerId: session.customer,
               subscriptionId: session.subscription,
               sessionId: session.id,
-              metadata: session.metadata,
+              allMetadata: session.metadata,
+              paymentStatus: session.payment_status,
+              mode: session.mode,
             });
 
             if (!userId || !planId) {

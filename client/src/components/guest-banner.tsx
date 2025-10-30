@@ -12,29 +12,29 @@ export function GuestBanner() {
 
   return (
     <Alert className="border-primary/50 bg-primary/5" data-testid="alert-guest-banner">
-      <Sparkles className="h-4 w-4 text-primary" />
-      <AlertDescription className="flex items-center justify-between gap-4">
+      <Sparkles className="h-5 w-5 md:h-4 md:w-4 text-primary" />
+      <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div className="flex-1">
-          <p className="font-medium text-sm">
+          <p className="font-medium text-base md:text-sm">
             You're using PocketTrack as a guest
           </p>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm md:text-sm text-muted-foreground mt-1.5 md:mt-1">
             {subscriptionCount > 0 ? (
               <>
-                You have {subscriptionCount} subscription{subscriptionCount !== 1 ? "s" : ""} saved locally. 
-                Create an account to sync across devices, unlock premium features, and never lose your data.
+                {subscriptionCount} subscription{subscriptionCount !== 1 ? "s" : ""} saved locally. 
+                Sign up to sync across devices and unlock premium features.
               </>
             ) : (
               <>
-                Create a free account to sync your subscriptions across devices, 
-                access Plaid bank integration, and unlock premium features.
+                Create a free account to sync subscriptions, access Plaid, and unlock features.
               </>
             )}
           </p>
         </div>
-        <div className="flex gap-2 flex-shrink-0">
+        <div className="flex gap-2 w-full sm:w-auto sm:flex-shrink-0">
           <Button 
-            size="sm" 
+            size="default"
+            className="flex-1 sm:flex-none min-h-11 md:min-h-9"
             variant="outline"
             onClick={() => setDismissed(true)}
             data-testid="button-dismiss-banner"
@@ -42,11 +42,12 @@ export function GuestBanner() {
             Dismiss
           </Button>
           <Button 
-            size="sm"
+            size="default"
+            className="flex-1 sm:flex-none min-h-11 md:min-h-9"
             onClick={() => window.location.href = "/api/login"}
             data-testid="button-sign-up"
           >
-            <UserPlus className="w-4 h-4 mr-2" />
+            <UserPlus className="w-5 h-5 md:w-4 md:h-4 mr-2" />
             Sign Up Free
           </Button>
         </div>

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Check, X as XIcon, Loader2, ArrowRight, Sparkles, HelpCircle } from "lucide-react";
+import { Check, X as XIcon, Loader2, ArrowRight, Sparkles, HelpCircle, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +77,36 @@ export default function Pricing() {
       toast({
         title: "Error",
         description: "Failed to create checkout session. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const syncPlanMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/user/sync-plan");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/plan"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      
+      if (data.synced) {
+        toast({
+          title: "Plan Synced Successfully",
+          description: data.message,
+        });
+      } else {
+        toast({
+          title: "Plan Check Complete",
+          description: data.message,
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync plan. Please try again.",
         variant: "destructive",
       });
     },
@@ -180,10 +210,25 @@ export default function Pricing() {
       )}
 
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-3" data-testid="text-pricing-title">
-          Simple, Transparent Pricing
-        </h1>
-        <p className="text-muted-foreground text-lg mb-6">
+        <div className="flex items-center justify-center gap-4 mb-3 flex-wrap">
+          <h1 className="text-3xl sm:text-4xl font-bold" data-testid="text-pricing-title">
+            Simple, Transparent Pricing
+          </h1>
+          {currentPlan && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncPlanMutation.mutate()}
+              disabled={syncPlanMutation.isPending}
+              data-testid="button-sync-plan"
+              className="gap-2 min-h-9"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncPlanMutation.isPending ? 'animate-spin' : ''}`} />
+              {syncPlanMutation.isPending ? 'Syncing...' : 'Refresh Plan'}
+            </Button>
+          )}
+        </div>
+        <p className="text-muted-foreground text-base sm:text-lg mb-6">
           Choose the plan that works best for you
         </p>
 

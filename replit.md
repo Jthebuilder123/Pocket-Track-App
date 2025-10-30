@@ -43,5 +43,40 @@ The system features a clear separation of concerns, centralized shared types and
 ## External Dependencies
 - **Plaid API**: Production-ready bank account integration for secure transaction access and automatic subscription detection.
 - **Stripe**: Payment processing for subscription plans with webhook-based plan activation.
+  - **Webhook Setup Required**: For production deployment, configure Stripe webhooks to point to your deployed app's webhook endpoint: `https://your-app-url.replit.app/api/webhooks/stripe`
+  - **Required Events**: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+  - **Webhook Secret**: Set `STRIPE_WEBHOOK_SECRET` environment variable with the signing secret from Stripe Dashboard
+  - **Manual Sync**: Users can manually sync their plan using the "Refresh Plan" button on the pricing page if webhook delivery fails
 - **PostgreSQL**: Relational database for all application data storage with multi-tenant isolation.
 - **SendGrid**: (Configurable) for email delivery of magic links and notifications.
+
+## Stripe Webhook Configuration
+
+### Production Setup
+To enable automatic plan updates after payment, configure Stripe webhooks:
+
+1. **Add Webhook Endpoint**:
+   - Navigate to Stripe Dashboard → Developers → Webhooks
+   - Click "Add endpoint"
+   - Enter URL: `https://your-deployed-app.replit.app/api/webhooks/stripe`
+   - Select events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+
+2. **Configure Signing Secret**:
+   - After creating the endpoint, copy the "Signing secret"
+   - Add to environment secrets: `STRIPE_WEBHOOK_SECRET=whsec_...`
+
+3. **Verify Webhook Delivery**:
+   - Complete a test payment
+   - Check Stripe Dashboard → Webhooks → Recent deliveries
+   - Check application logs for `[STRIPE WEBHOOK]` entries
+
+4. **Troubleshooting**:
+   - If webhooks fail, users can manually sync their plan using the "Refresh Plan" button on `/pricing`
+   - Check logs with prefix `[STRIPE WEBHOOK]` for detailed webhook processing information
+   - Verify webhook URL is publicly accessible and returns 200 OK
+
+### Development Mode
+In development without `STRIPE_WEBHOOK_SECRET`, webhooks process without signature verification. This is useful for local testing with Stripe CLI:
+```bash
+stripe listen --forward-to http://localhost:5000/api/webhooks/stripe
+```
