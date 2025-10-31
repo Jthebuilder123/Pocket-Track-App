@@ -69,9 +69,19 @@
           
           // Set global flag for error handling
           window.plaidLoadFailed = true;
+          
+          // Dispatch custom event for React components to listen
+          window.dispatchEvent(new CustomEvent('plaidLoadStatusChanged', { 
+            detail: { failed: true } 
+          }));
         } else {
           console.log('[PLAID-SDK] Successfully loaded');
           window.plaidLoadFailed = false;
+          
+          // Dispatch success event as well
+          window.dispatchEvent(new CustomEvent('plaidLoadStatusChanged', { 
+            detail: { failed: false } 
+          }));
         }
       });
     </script>

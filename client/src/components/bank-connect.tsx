@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, RefreshCw, Unplug, AlertCircle, LogIn, Lock, Crown } from "lucide-react";
+import { Building2, RefreshCw, Unplug, AlertCircle, LogIn, Lock, Crown, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { apiRequest, queryClient, ApiError } from "@/lib/queryClient";
 import { type BankConnection } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useState, useEffect } from "react";
 
 // Debug logging flag - set to false to disable verbose console logs in production
 const DEBUG_BANK_CONNECT = import.meta.env.DEV;
@@ -71,6 +72,27 @@ function getErrorMessage(error: any): { message: string; isLimitError: boolean }
 export function BankConnect() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  // Check if Plaid SDK failed to load
+  const [plaidLoadFailed, setPlaidLoadFailed] = useState(false);
+  
+  useEffect(() => {
+    // Check current status immediately (in case SDK already loaded/failed before mount)
+    if (typeof window !== 'undefined' && (window as any).plaidLoadFailed === true) {
+      setPlaidLoadFailed(true);
+    }
+    
+    // Listen for plaidLoadStatusChanged event dispatched from index.html
+    const handlePlaidStatusChange = (event: CustomEvent) => {
+      setPlaidLoadFailed(event.detail.failed);
+    };
+    
+    window.addEventListener('plaidLoadStatusChanged', handlePlaidStatusChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('plaidLoadStatusChanged', handlePlaidStatusChange as EventListener);
+    };
+  }, []);
 
   // Check authentication status
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -207,6 +229,27 @@ export function BankConnect() {
           <span>Connect Bank</span>
         </Button>
       </div>
+
+      {plaidLoadFailed && (
+        <Alert variant="destructive" data-testid="alert-plaid-load-error">
+          <XCircle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Bank connection unavailable</strong>
+            <p className="mt-2 text-sm">
+              The Plaid banking service failed to load. This may be caused by:
+            </p>
+            <ul className="mt-2 ml-4 text-sm list-disc space-y-1">
+              <li>Browser extensions blocking third-party scripts</li>
+              <li>Ad blockers preventing the Plaid SDK from loading</li>
+              <li>Network connectivity issues</li>
+            </ul>
+            <p className="mt-2 text-sm">
+              <strong>To fix this:</strong> Try refreshing the page, temporarily disabling browser extensions, 
+              or using a different browser. If the problem persists, please contact support.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {connections.length === 0 && !isLoading && (
         <Alert data-testid="alert-no-banks">
