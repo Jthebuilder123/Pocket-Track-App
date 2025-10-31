@@ -164,9 +164,10 @@
         const isMobileBrowser = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
         const webViewInfo = detectWebView();
         
-        // CRITICAL FIX: Mobile WebViews need OAuth redirect, not modal mode
-        // Only desktop WebViews and desktop browsers use modal mode
-        const shouldUseOAuth = (isMobileBrowser && !webViewInfo.isDesktopWebView) || webViewInfo.isMobileWebView;
+        // CRITICAL FIX: Only actual mobile WebViews need OAuth redirect mode
+        // Mobile browsers (Safari, Chrome) work fine with modal mode
+        // Desktop WebViews (Electron) and desktop browsers use modal mode
+        const shouldUseOAuth = webViewInfo.isMobileWebView;
         
         return {
           isMobileWebView: webViewInfo.isMobileWebView,
@@ -181,8 +182,8 @@
         console.log('[PLAID-LINK] Device detection: Mobile WebView (React Native/Cordova/iOS-Android) - will use OAuth redirect');
       } else if (DEVICE_CONTEXT.isDesktopWebView) {
         console.log('[PLAID-LINK] Device detection: Desktop WebView (Electron) - will use modal mode');
-      } else if (DEVICE_CONTEXT.shouldUseOAuthRedirect) {
-        console.log('[PLAID-LINK] Device detection: Mobile browser (Safari/Chrome on iOS/Android) - will use OAuth redirect');
+      } else if (DEVICE_CONTEXT.isMobileBrowser) {
+        console.log('[PLAID-LINK] Device detection: Mobile browser (Safari/Chrome on iOS/Android) - will use modal mode');
       } else {
         console.log('[PLAID-LINK] Device detection: Desktop browser - will use modal mode');
       }
