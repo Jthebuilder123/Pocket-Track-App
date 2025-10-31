@@ -42,6 +42,12 @@ The system features a clear separation of concerns, centralized shared types and
 
 ## External Dependencies
 - **Plaid API**: Production-ready bank account integration for secure transaction access and automatic subscription detection.
+  - **Multi-Device Support**: Plaid Link adapts to different environments:
+    - **Desktop browsers**: Modal/iframe mode for seamless in-page experience
+    - **Mobile browsers** (Safari, Chrome on iOS/Android): OAuth redirect mode for native browser authentication
+    - **WebView apps** (React Native, Cordova, Capacitor, Expo): Modal mode for in-app compatibility
+  - **WebView Detection**: Automatically detects WebView environments (window.ReactNativeWebView, window.cordova, window.Capacitor, iOS in-app browsers) to prevent OAuth redirect issues in native app wrappers
+  - **Device Context Caching**: Detection results cached on page load for consistency across event handlers
 - **Stripe**: Payment processing for subscription plans with webhook-based plan activation.
   - **Webhook Setup Required**: For production deployment, configure Stripe webhooks to point to your deployed app's webhook endpoint: `https://your-app-url.replit.app/api/webhooks/stripe`
   - **Required Events**: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
