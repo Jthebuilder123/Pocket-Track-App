@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText, LogOut, LogIn, User, Upload, Crown } from "lucide-react";
-import logoHeader from "@/assets/logo-header.png";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -265,11 +264,12 @@ export function DashboardPage() {
           <button 
             type="button"
             onClick={() => setLocation("/")}
-            className="flex items-center cursor-pointer hover-elevate active-elevate-2 px-1.5 sm:px-2 py-1 rounded-md bg-transparent border-0"
+            className="flex items-center gap-2 cursor-pointer hover-elevate active-elevate-2 px-1.5 sm:px-2 py-1 rounded-md bg-transparent border-0"
             data-testid="link-logo"
             aria-label="Go to homepage"
           >
-            <img src={logoHeader} alt="PocketTrack" className="h-6 sm:h-8 w-auto" />
+            <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+            <span className="font-semibold text-base sm:text-lg">PocketTrack</span>
           </button>
           <div className="flex items-center gap-1.5 sm:gap-2">
             {user && (
