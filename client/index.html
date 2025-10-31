@@ -106,14 +106,77 @@
     <script>
       console.log('[PLAID-LINK] Attaching event handler for Connect Bank buttons...');
       
-      // Mobile browser detection - mobile browsers need OAuth redirect mode
-      function isMobileBrowser() {
+      // WebView detection - React Native, Cordova, Capacitor, Expo, etc.
+      function isWebView() {
+        // Check for React Native WebView (modern versions)
+        if (window.ReactNativeWebView !== undefined) {
+          return true;
+        }
+        
+        // Check for Cordova/PhoneGap
+        if (window.cordova !== undefined || window.phonegap !== undefined) {
+          return true;
+        }
+        
+        // Check for Capacitor
+        if (window.Capacitor !== undefined) {
+          return true;
+        }
+        
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-        return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+        
+        // Check for Android WebView (has "wv" in user agent)
+        if (/wv|WebView/i.test(userAgent)) {
+          return true;
+        }
+        
+        // Check for iOS WebView heuristics
+        // iOS WebViews often lack "Safari/" in user agent while having "Mobile/"
+        const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+        const hasSafari = /Safari/i.test(userAgent);
+        const hasMobile = /Mobile/i.test(userAgent);
+        
+        if (isIOS && hasMobile && !hasSafari) {
+          // Likely an iOS WebView (in-app browser)
+          return true;
+        }
+        
+        // Additional iOS WebView check: WKWebView doesn't set navigator.standalone
+        // but can be detected by missing Safari + present webkit
+        if (isIOS && !hasSafari && /AppleWebKit/i.test(userAgent)) {
+          return true;
+        }
+        
+        return false;
       }
       
-      const isMobile = isMobileBrowser();
-      console.log('[PLAID-LINK] Device detection:', isMobile ? 'Mobile (will use OAuth redirect)' : 'Desktop (will use modal)');
+      // Cache detection results to avoid recalculating and ensure consistency
+      const DEVICE_CONTEXT = (function() {
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        const isMobileBrowser = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+        const inWebView = isWebView();
+        
+        // Use OAuth only for mobile browsers that are NOT in a WebView
+        const shouldUseOAuth = isMobileBrowser && !inWebView;
+        
+        return {
+          isWebView: inWebView,
+          isMobileBrowser: isMobileBrowser,
+          shouldUseOAuthRedirect: shouldUseOAuth
+        };
+      })();
+      
+      // Log device detection result once
+      if (DEVICE_CONTEXT.isWebView) {
+        console.log('[PLAID-LINK] Device detection: WebView (will use modal mode)');
+      } else if (DEVICE_CONTEXT.shouldUseOAuthRedirect) {
+        console.log('[PLAID-LINK] Device detection: Mobile browser (will use OAuth redirect)');
+      } else {
+        console.log('[PLAID-LINK] Device detection: Desktop (will use modal)');
+      }
+      
+      // Expose for use in event handlers
+      const isMobile = DEVICE_CONTEXT.shouldUseOAuthRedirect;
       
       // Auto-resume Plaid Link if returning from OAuth redirect
       if (window.plaidOAuthRedirect) {
