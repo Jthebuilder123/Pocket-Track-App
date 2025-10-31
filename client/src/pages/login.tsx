@@ -44,7 +44,8 @@ export default function Login() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
-          <CardContent className="flex items-center justify-center py-12">
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-6">
+            <img src={logoLogin} alt="PocketTrack" className="h-20 w-auto" />
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </CardContent>
         </Card>

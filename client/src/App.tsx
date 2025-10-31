@@ -10,6 +10,7 @@ import ClickTest from "@/pages/click-test";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import logoSplash from "@/assets/logo-splash.png";
 /* FIX: Import click debugger for diagnosing button clickability issues */
 import "@/lib/click-debugger";
 
@@ -18,7 +19,8 @@ function Router() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-6">
+        <img src={logoSplash} alt="PocketTrack" className="h-32 w-auto" />
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
