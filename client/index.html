@@ -54,11 +54,32 @@
       }
     </script>
     
-    <!-- Plaid Link SDK -->
-    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+    <!-- Plaid Link SDK with cache busting -->
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js?v=2025103101"></script>
+    
+    <!-- Plaid SDK Load Detection -->
+    <script>
+      // Defensive check: Verify Plaid SDK loaded successfully
+      window.addEventListener('load', function() {
+        if (typeof window.Plaid === 'undefined') {
+          console.error('[PLAID-SDK] CRITICAL: Plaid SDK failed to load! Check Content Security Policy.');
+          console.error('[PLAID-SDK] Expected: window.Plaid object');
+          console.error('[PLAID-SDK] Actual: undefined');
+          console.error('[PLAID-SDK] CSP may be blocking https://cdn.plaid.com');
+          
+          // Set global flag for error handling
+          window.plaidLoadFailed = true;
+        } else {
+          console.log('[PLAID-SDK] Successfully loaded');
+          window.plaidLoadFailed = false;
+        }
+      });
+    </script>
     
     <!-- Plaid Link Event Handler -->
     <script>
+      console.log('[PLAID-LINK] Attaching event handler for Connect Bank buttons...');
+      
       // FIX: Vanilla JS event delegation for Connect Bank button
       // Prevents overlay blocking and ensures reliable click handling
       document.addEventListener('click', async (e) => {
@@ -69,6 +90,13 @@
         e.stopPropagation();
         
         console.log('[PLAID-LINK] Connect Bank button clicked');
+        
+        // Check if Plaid SDK loaded
+        if (window.plaidLoadFailed || typeof window.Plaid === 'undefined') {
+          console.error('[PLAID-LINK] Cannot proceed - Plaid SDK not loaded');
+          alert('Bank connection is unavailable. The Plaid SDK failed to load. Please refresh the page and try again.');
+          return;
+        }
         
         // Disable button during processing
         el.disabled = true;

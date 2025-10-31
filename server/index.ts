@@ -8,41 +8,49 @@ import { setupVite, serveStatic, log } from "./vite";
 const app = express();
 
 // Security middleware with custom CSP for Plaid and Stripe integration
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  scriptSrc: [
+    "'self'",
+    "'unsafe-inline'", // Required for inline scripts in smoke test and main app
+    "https://cdn.plaid.com", // Plaid Link SDK
+    "https://checkout.stripe.com", // Stripe checkout
+    "https://js.stripe.com", // Stripe.js
+  ],
+  connectSrc: [
+    "'self'",
+    "https://*.plaid.com", // Plaid API endpoints
+    "https://api.stripe.com", // Stripe API
+  ],
+  frameSrc: [
+    "'self'",
+    "https://cdn.plaid.com", // Plaid Link iframe
+    "https://checkout.stripe.com", // Stripe checkout iframe
+  ],
+  styleSrc: [
+    "'self'",
+    "'unsafe-inline'", // Required for inline styles
+  ],
+  imgSrc: [
+    "'self'",
+    "data:", // For inline images
+    "https:", // Allow external images
+  ],
+  formAction: [
+    "'self'",
+    "https://checkout.stripe.com", // Allow form submissions to Stripe
+  ],
+};
+
+console.log('[CSP] Content Security Policy configured:', {
+  scriptSrc: cspDirectives.scriptSrc,
+  connectSrc: cspDirectives.connectSrc,
+  frameSrc: cspDirectives.frameSrc,
+});
+
 app.use(helmet({
   contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: [
-        "'self'",
-        "'unsafe-inline'", // Required for inline scripts in smoke test and main app
-        "https://cdn.plaid.com", // Plaid Link SDK
-        "https://checkout.stripe.com", // Stripe checkout
-        "https://js.stripe.com", // Stripe.js
-      ],
-      connectSrc: [
-        "'self'",
-        "https://*.plaid.com", // Plaid API endpoints
-        "https://api.stripe.com", // Stripe API
-      ],
-      frameSrc: [
-        "'self'",
-        "https://cdn.plaid.com", // Plaid Link iframe
-        "https://checkout.stripe.com", // Stripe checkout iframe
-      ],
-      styleSrc: [
-        "'self'",
-        "'unsafe-inline'", // Required for inline styles
-      ],
-      imgSrc: [
-        "'self'",
-        "data:", // For inline images
-        "https:", // Allow external images
-      ],
-      formAction: [
-        "'self'",
-        "https://checkout.stripe.com", // Allow form submissions to Stripe
-      ],
-    },
+    directives: cspDirectives,
   },
 }));
 
