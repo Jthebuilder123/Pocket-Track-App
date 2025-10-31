@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { LogIn, Loader2, X } from "lucide-react";
+import logoLogin from "@/assets/logo-login.png";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -63,11 +64,16 @@ export default function Login() {
         >
           <X className="h-4 w-4" />
         </Button>
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Welcome to PocketTrack</CardTitle>
-          <CardDescription>
-            Track and manage your subscriptions with ease
-          </CardDescription>
+        <CardHeader className="text-center space-y-6">
+          <div className="flex justify-center">
+            <img src={logoLogin} alt="PocketTrack" className="h-20 w-auto" />
+          </div>
+          <div className="space-y-2">
+            <CardTitle className="text-2xl">Welcome to PocketTrack</CardTitle>
+            <CardDescription>
+              Track and manage your subscriptions with ease
+            </CardDescription>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button
