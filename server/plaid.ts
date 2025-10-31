@@ -50,16 +50,32 @@ export const createLinkToken = async (userId: string, redirectUri?: string) => {
   };
   
   // Add redirect_uri for mobile OAuth flow
+  // NOTE: In production, redirect_uri must be registered in Plaid Dashboard
+  // In sandbox, any redirect_uri can be used dynamically
   if (redirectUri) {
     config.redirect_uri = redirectUri;
     logger.info('[PLAID] Creating link token with redirect URI for mobile OAuth', { 
+      environment: PLAID_ENV,
       redirectUri: redirectUri.substring(0, 50) + '...' 
+    });
+  } else {
+    logger.info('[PLAID] Creating link token for modal flow (no redirect URI)', {
+      environment: PLAID_ENV
     });
   }
   
-  const response = await plaidClient.linkTokenCreate(config);
-  
-  return response.data.link_token;
+  try {
+    const response = await plaidClient.linkTokenCreate(config);
+    return response.data.link_token;
+  } catch (error: any) {
+    logger.error('[PLAID] Failed to create link token', {
+      error: error.message,
+      response: error.response?.data,
+      hasRedirectUri: !!redirectUri,
+      environment: PLAID_ENV
+    });
+    throw error;
+  }
 };
 
 export const exchangePublicToken = async (publicToken: string) => {

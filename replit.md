@@ -45,9 +45,14 @@ The system features a clear separation of concerns, centralized shared types and
   - **Multi-Device Support**: Plaid Link adapts to different environments:
     - **Desktop browsers**: Modal/iframe mode for seamless in-page experience
     - **Mobile browsers** (Safari, Chrome on iOS/Android): OAuth redirect mode for native browser authentication
-    - **WebView apps** (React Native, Cordova, Capacitor, Expo): Modal mode for in-app compatibility
-  - **WebView Detection**: Automatically detects WebView environments (window.ReactNativeWebView, window.cordova, window.Capacitor, iOS in-app browsers) to prevent OAuth redirect issues in native app wrappers
+    - **Mobile WebView apps** (React Native, Cordova, Capacitor, Expo on iOS/Android): OAuth redirect mode for proper mobile WebView compatibility
+    - **Desktop WebView apps** (Electron): Modal mode for desktop WebView compatibility
+  - **WebView Detection**: Automatically detects WebView environments (window.ReactNativeWebView, window.cordova, window.Capacitor, iOS/Android in-app browsers) and distinguishes between mobile and desktop WebViews
   - **Device Context Caching**: Detection results cached on page load for consistency across event handlers
+  - **Production Requirements**: 
+    - For production (`PLAID_ENV=production`), redirect URIs must be registered in Plaid Dashboard under Settings → API → Allowed redirect URIs
+    - For sandbox (`PLAID_ENV=sandbox`), any redirect URI can be used dynamically for testing
+    - Mobile OAuth flow requires `redirect_uri` parameter in link token creation
 - **Stripe**: Payment processing for subscription plans with webhook-based plan activation.
   - **Webhook Setup Required**: For production deployment, configure Stripe webhooks to point to your deployed app's webhook endpoint: `https://your-app-url.replit.app/api/webhooks/stripe`
   - **Required Events**: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
