@@ -1700,6 +1700,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/create-checkout-session - Create Stripe Checkout session
   app.post("/api/create-checkout-session", requireAuth, async (req: any, res: any) => {
     try {
+      logger.info("[STRIPE CHECKOUT] Creating checkout session", { 
+        body: req.body,
+        hasStripeKey: !!process.env.STRIPE_SECRET_KEY,
+        keyPrefix: process.env.STRIPE_SECRET_KEY?.substring(0, 7)
+      });
+
       const schema = z.object({
         planId: z.enum([PRICING_TIERS.ESSENTIALS, PRICING_TIERS.PRO]),
         billingInterval: z.enum(["monthly", "yearly"]),
@@ -1707,12 +1713,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = schema.safeParse(req.body);
       if (!result.success) {
+        logger.error("[STRIPE CHECKOUT] Validation failed", { error: fromZodError(result.error).toString() });
         return res.status(400).json({ error: fromZodError(result.error).toString() });
       }
 
       const { planId, billingInterval } = result.data;
       const userId = req.user!.claims.sub;
       const userEmail = req.user!.claims.email;
+      
+      logger.info("[STRIPE CHECKOUT] Validated request", { planId, billingInterval, userId });
       
       const user = await storage.getUser(userId);
       if (!user) {
