@@ -36,10 +36,10 @@ function ensurePlaidConfigured() {
   }
 }
 
-export const createLinkToken = async (userId: string) => {
+export const createLinkToken = async (userId: string, redirectUri?: string) => {
   ensurePlaidConfigured();
   
-  const response = await plaidClient.linkTokenCreate({
+  const config: any = {
     user: {
       client_user_id: userId,
     },
@@ -47,7 +47,17 @@ export const createLinkToken = async (userId: string) => {
     products: [Products.Transactions],
     country_codes: [CountryCode.Us],
     language: 'en',
-  });
+  };
+  
+  // Add redirect_uri for mobile OAuth flow
+  if (redirectUri) {
+    config.redirect_uri = redirectUri;
+    logger.info('[PLAID] Creating link token with redirect URI for mobile OAuth', { 
+      redirectUri: redirectUri.substring(0, 50) + '...' 
+    });
+  }
+  
+  const response = await plaidClient.linkTokenCreate(config);
   
   return response.data.link_token;
 };

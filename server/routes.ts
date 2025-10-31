@@ -1113,8 +1113,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/create_link_token", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub || "demo-user-123"; // Fallback for testing
-      logger.info("[PLAID] Creating link token", { userId: userId.substring(0, 8) + "..." });
-      const linkToken = await createLinkToken(userId);
+      const redirectUri = req.query.redirect_uri as string | undefined;
+      
+      logger.info("[PLAID] Creating link token", { 
+        userId: userId.substring(0, 8) + "...",
+        hasRedirectUri: !!redirectUri 
+      });
+      
+      const linkToken = await createLinkToken(userId, redirectUri);
       logger.info("[PLAID] Link token created successfully");
       res.json({ link_token: linkToken });
     } catch (error: any) {

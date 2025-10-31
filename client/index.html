@@ -86,9 +86,114 @@
       });
     </script>
     
+    <!-- Plaid OAuth Redirect Handler -->
+    <script>
+      // Handle OAuth redirect from Plaid (mobile flow)
+      // When user returns from Plaid authentication, URL contains oauth_state_id
+      // IMPORTANT: Set this flag synchronously so it's available when resume script runs
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasOAuthState = urlParams.has('oauth_state_id');
+      
+      if (hasOAuthState) {
+        console.log('[PLAID-OAUTH] Detected OAuth redirect from Plaid, will resume Link flow...');
+        window.plaidOAuthRedirect = true;
+      } else {
+        window.plaidOAuthRedirect = false;
+      }
+    </script>
+    
     <!-- Plaid Link Event Handler -->
     <script>
       console.log('[PLAID-LINK] Attaching event handler for Connect Bank buttons...');
+      
+      // Mobile browser detection - mobile browsers need OAuth redirect mode
+      function isMobileBrowser() {
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+      }
+      
+      const isMobile = isMobileBrowser();
+      console.log('[PLAID-LINK] Device detection:', isMobile ? 'Mobile (will use OAuth redirect)' : 'Desktop (will use modal)');
+      
+      // Auto-resume Plaid Link if returning from OAuth redirect
+      if (window.plaidOAuthRedirect) {
+        console.log('[PLAID-OAUTH] Resuming Plaid Link flow after OAuth redirect...');
+        
+        window.addEventListener('load', async function() {
+          // Wait for Plaid SDK to load
+          if (typeof window.Plaid === 'undefined') {
+            console.error('[PLAID-OAUTH] Cannot resume - Plaid SDK not loaded');
+            return;
+          }
+          
+          try {
+            // Retrieve the original link token from sessionStorage
+            const link_token = sessionStorage.getItem('plaid_link_token');
+            
+            if (!link_token) {
+              console.error('[PLAID-OAUTH] Cannot resume - no link token found in sessionStorage');
+              // Clean up URL and let user try again
+              window.history.replaceState({}, document.title, window.location.pathname);
+              return;
+            }
+            
+            console.log('[PLAID-OAUTH] Reusing stored link token to resume OAuth flow');
+            
+            // Create Plaid Link handler with receivedRedirectUri to resume OAuth flow
+            const handler = window.Plaid.create({
+              token: link_token, // Reuse the original link token
+              receivedRedirectUri: window.location.href, // Full URL with oauth params
+              onSuccess: async (public_token, metadata) => {
+                console.log('[PLAID-OAUTH] OAuth flow completed, exchanging token...');
+                
+                try {
+                  const exchangeResponse = await fetch('/api/exchange_public_token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ public_token })
+                  });
+                  
+                  if (!exchangeResponse.ok) throw new Error('Failed to exchange token');
+                  
+                  console.log('[PLAID-OAUTH] Token exchanged successfully');
+                  
+                  // Clean up sessionStorage
+                  sessionStorage.removeItem('plaid_link_token');
+                  
+                  // Clean up URL and redirect to home
+                  window.location.href = '/';
+                } catch (error) {
+                  console.error('[PLAID-OAUTH] Error exchanging token:', error);
+                  alert('Failed to connect bank. Please try again.');
+                  // Clean up sessionStorage and URL
+                  sessionStorage.removeItem('plaid_link_token');
+                  window.history.replaceState({}, document.title, window.location.pathname);
+                }
+              },
+              onExit: (err, metadata) => {
+                console.log('[PLAID-OAUTH] OAuth flow exited', { err, metadata });
+                // Clean up sessionStorage and URL
+                sessionStorage.removeItem('plaid_link_token');
+                window.history.replaceState({}, document.title, window.location.pathname);
+              },
+              onEvent: (eventName, metadata) => {
+                console.log('[PLAID-OAUTH] Event:', eventName, metadata);
+              }
+            });
+            
+            // Open Plaid Link to resume OAuth flow
+            console.log('[PLAID-OAUTH] Opening Plaid Link with receivedRedirectUri to resume OAuth flow');
+            handler.open();
+            
+          } catch (error) {
+            console.error('[PLAID-OAUTH] Error resuming OAuth flow:', error);
+            // Clean up sessionStorage and URL
+            sessionStorage.removeItem('plaid_link_token');
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        });
+      }
       
       // FIX: Vanilla JS event delegation for Connect Bank button
       // Prevents overlay blocking and ensures reliable click handling
@@ -123,7 +228,14 @@
         try {
           // Fetch link token from backend
           console.log('[PLAID-LINK] Fetching link token...');
-          const linkTokenResponse = await fetch('/api/create_link_token', {
+          
+          // For mobile, include redirect_uri so Plaid can return after OAuth
+          const redirectUri = isMobile ? window.location.href.split('?')[0] : null;
+          const linkTokenUrl = redirectUri 
+            ? `/api/create_link_token?redirect_uri=${encodeURIComponent(redirectUri)}`
+            : '/api/create_link_token';
+          
+          const linkTokenResponse = await fetch(linkTokenUrl, {
             credentials: 'include'
           });
           
@@ -132,10 +244,16 @@
           }
           
           const { link_token } = await linkTokenResponse.json();
-          console.log('[PLAID-LINK] Link token received');
+          console.log('[PLAID-LINK] Link token received', { isMobile, redirectUri });
+          
+          // Store link token in sessionStorage for OAuth redirect resume (mobile only)
+          if (isMobile && redirectUri) {
+            sessionStorage.setItem('plaid_link_token', link_token);
+            console.log('[PLAID-LINK] Stored link token in sessionStorage for OAuth resume');
+          }
           
           // Create and open Plaid Link
-          const handler = window.Plaid.create({
+          const plaidConfig = {
             token: link_token,
             onSuccess: async (public_token, metadata) => {
               console.log('[PLAID-LINK] Plaid Link success, exchanging token...');
@@ -192,9 +310,15 @@
             onEvent: (eventName, metadata) => {
               console.log('[PLAID-LINK] Plaid Link event:', eventName, metadata);
             }
-          });
+          };
           
-          console.log('[PLAID-LINK] Opening Plaid Link modal...');
+          // IMPORTANT: Do NOT set receivedRedirectUri on initial launch
+          // Only set it when resuming from OAuth redirect (handled in OAuth redirect handler above)
+          // Setting it too early causes Plaid Link to error before redirect
+          
+          const handler = window.Plaid.create(plaidConfig);
+          
+          console.log('[PLAID-LINK] Opening Plaid Link...', isMobile ? '(will use OAuth redirect)' : '(modal mode)');
           handler.open();
           
         } catch (error) {
