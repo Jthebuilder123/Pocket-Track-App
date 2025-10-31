@@ -108,28 +108,28 @@
     <script>
       console.log('[PLAID-LINK] Attaching event handler for Connect Bank buttons...');
       
-      // WebView detection - React Native, Cordova, Capacitor, Expo, etc.
-      function isWebView() {
+      // WebView detection - returns { isMobileWebView, isDesktopWebView }
+      function detectWebView() {
+        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+        
         // Check for React Native WebView (modern versions)
         if (window.ReactNativeWebView !== undefined) {
-          return true;
+          return { isMobileWebView: true, isDesktopWebView: false };
         }
         
         // Check for Cordova/PhoneGap
         if (window.cordova !== undefined || window.phonegap !== undefined) {
-          return true;
+          return { isMobileWebView: true, isDesktopWebView: false };
         }
         
         // Check for Capacitor
         if (window.Capacitor !== undefined) {
-          return true;
+          return { isMobileWebView: true, isDesktopWebView: false };
         }
-        
-        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
         
         // Check for Android WebView (has "wv" in user agent)
         if (/wv|WebView/i.test(userAgent)) {
-          return true;
+          return { isMobileWebView: true, isDesktopWebView: false };
         }
         
         // Check for iOS WebView heuristics
@@ -140,41 +140,51 @@
         
         if (isIOS && hasMobile && !hasSafari) {
           // Likely an iOS WebView (in-app browser)
-          return true;
+          return { isMobileWebView: true, isDesktopWebView: false };
         }
         
         // Additional iOS WebView check: WKWebView doesn't set navigator.standalone
         // but can be detected by missing Safari + present webkit
         if (isIOS && !hasSafari && /AppleWebKit/i.test(userAgent)) {
-          return true;
+          return { isMobileWebView: true, isDesktopWebView: false };
         }
         
-        return false;
+        // Check for desktop WebViews (Electron, etc.)
+        // Electron apps typically have "Electron" in user agent
+        if (/Electron/i.test(userAgent)) {
+          return { isMobileWebView: false, isDesktopWebView: true };
+        }
+        
+        return { isMobileWebView: false, isDesktopWebView: false };
       }
       
       // Cache detection results to avoid recalculating and ensure consistency
       const DEVICE_CONTEXT = (function() {
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
         const isMobileBrowser = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
-        const inWebView = isWebView();
+        const webViewInfo = detectWebView();
         
-        // Use OAuth only for mobile browsers that are NOT in a WebView
-        const shouldUseOAuth = isMobileBrowser && !inWebView;
+        // CRITICAL FIX: Mobile WebViews need OAuth redirect, not modal mode
+        // Only desktop WebViews and desktop browsers use modal mode
+        const shouldUseOAuth = (isMobileBrowser && !webViewInfo.isDesktopWebView) || webViewInfo.isMobileWebView;
         
         return {
-          isWebView: inWebView,
+          isMobileWebView: webViewInfo.isMobileWebView,
+          isDesktopWebView: webViewInfo.isDesktopWebView,
           isMobileBrowser: isMobileBrowser,
           shouldUseOAuthRedirect: shouldUseOAuth
         };
       })();
       
-      // Log device detection result once
-      if (DEVICE_CONTEXT.isWebView) {
-        console.log('[PLAID-LINK] Device detection: WebView (will use modal mode)');
+      // Log device detection result once with detailed info
+      if (DEVICE_CONTEXT.isMobileWebView) {
+        console.log('[PLAID-LINK] Device detection: Mobile WebView (React Native/Cordova/iOS-Android) - will use OAuth redirect');
+      } else if (DEVICE_CONTEXT.isDesktopWebView) {
+        console.log('[PLAID-LINK] Device detection: Desktop WebView (Electron) - will use modal mode');
       } else if (DEVICE_CONTEXT.shouldUseOAuthRedirect) {
-        console.log('[PLAID-LINK] Device detection: Mobile browser (will use OAuth redirect)');
+        console.log('[PLAID-LINK] Device detection: Mobile browser (Safari/Chrome on iOS/Android) - will use OAuth redirect');
       } else {
-        console.log('[PLAID-LINK] Device detection: Desktop (will use modal)');
+        console.log('[PLAID-LINK] Device detection: Desktop browser - will use modal mode');
       }
       
       // Expose for use in event handlers
