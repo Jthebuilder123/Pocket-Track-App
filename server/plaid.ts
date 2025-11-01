@@ -58,13 +58,18 @@ export const createLinkToken = async (
   
   // Hosted Link for mobile WebViews (React Native, Cordova, etc.)
   // Opens in native browser (ASWebAuthenticationSession/Custom Tabs)
+  // IMPORTANT: Plaid requires BOTH redirect_uri and hosted_link.completion_redirect_uri
   if (options?.isMobileWebView && options?.completionRedirectUri) {
+    // Set redirect_uri to the base URL (required by Plaid)
+    const baseUrl = options.completionRedirectUri.split('/plaid/callback')[0] + '/';
+    config.redirect_uri = baseUrl;
     config.hosted_link = {
       is_mobile_app: true,
       completion_redirect_uri: options.completionRedirectUri,
     };
     logger.info('[PLAID] Creating Hosted Link token for mobile WebView', { 
       environment: PLAID_ENV,
+      redirectUri: baseUrl.substring(0, 50) + '...',
       completionRedirectUri: options.completionRedirectUri.substring(0, 50) + '...'
     });
   }
