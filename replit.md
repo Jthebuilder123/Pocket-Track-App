@@ -45,14 +45,23 @@ The system features a clear separation of concerns, centralized shared types and
   - **Multi-Device Support**: Plaid Link adapts to different environments:
     - **Desktop browsers**: Modal/iframe mode for seamless in-page experience
     - **Mobile browsers** (Safari, Chrome on iOS/Android): OAuth redirect mode for native browser authentication
-    - **Mobile WebView apps** (React Native, Cordova, Capacitor, Expo on iOS/Android): OAuth redirect mode for proper mobile WebView compatibility
+    - **Mobile WebView apps** (React Native, Cordova, Capacitor, Expo on iOS/Android): **Hosted Link** with native browser authentication for proper WebView compatibility
     - **Desktop WebView apps** (Electron): Modal mode for desktop WebView compatibility
   - **WebView Detection**: Automatically detects WebView environments (window.ReactNativeWebView, window.cordova, window.Capacitor, iOS/Android in-app browsers) and distinguishes between mobile and desktop WebViews
   - **Device Context Caching**: Detection results cached on page load for consistency across event handlers
+  - **Hosted Link for TestFlight/Mobile Apps**:
+    - Uses Plaid's recommended Hosted Link for WebView apps (opens in iOS ASWebAuthenticationSession or Android Custom Tabs)
+    - Server-side callback storage system to overcome storage isolation between native browser and WebView
+    - Backend stores callback results in-memory Map keyed by user ID
+    - WebView polls `/api/plaid/callback-result` endpoint when regaining focus after native browser closes
+    - Callback page at `/plaid/callback` handles OAuth completion and stores result server-side
+    - Multiple trigger points: immediate execution, window load, visibilitychange, and focus events
+    - Duplicate-processing guard to prevent race conditions
   - **Production Requirements**: 
     - For production (`PLAID_ENV=production`), redirect URIs must be registered in Plaid Dashboard under Settings → API → Allowed redirect URIs
     - For sandbox (`PLAID_ENV=sandbox`), any redirect URI can be used dynamically for testing
-    - Mobile OAuth flow requires `redirect_uri` parameter in link token creation
+    - Mobile OAuth flow requires `redirect_uri` parameter in link token creation with `hosted_link.is_mobile_app = true`
+    - Completion redirect URI: `https://your-app-url.replit.app/plaid/callback`
 - **Stripe**: Payment processing for subscription plans with webhook-based plan activation.
   - **Webhook Setup Required**: For production deployment, configure Stripe webhooks to point to your deployed app's webhook endpoint: `https://your-app-url.replit.app/api/webhooks/stripe`
   - **Required Events**: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
