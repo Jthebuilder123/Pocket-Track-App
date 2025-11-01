@@ -1117,17 +1117,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isMobileWebView = req.query.is_mobile_webview === 'true';
       const completionRedirectUri = req.query.completion_redirect_uri as string | undefined;
       
+      // FIX: PLAID - Support native mobile app (React Native SDK)
+      // Check if this is a native app request (from React Native)
+      const isNativeApp = redirectUri === 'pockettrack://plaid-redirect' || 
+                          req.get('User-Agent')?.includes('ReactNativeWebView');
+      
       logger.info("[PLAID] Creating link token", { 
         userId: userId.substring(0, 8) + "...",
         hasRedirectUri: !!redirectUri,
         isMobileWebView,
-        hasCompletionRedirectUri: !!completionRedirectUri
+        hasCompletionRedirectUri: !!completionRedirectUri,
+        isNativeApp
       });
       
+      // For native apps, use the native redirect URI directly
+      const finalRedirectUri = isNativeApp ? 'pockettrack://plaid-redirect' : redirectUri;
+      
       const linkToken = await createLinkToken(userId, {
-        redirectUri,
-        isMobileWebView,
-        completionRedirectUri
+        redirectUri: finalRedirectUri,
+        isMobileWebView: isMobileWebView && !isNativeApp, // Only use WebView hosted link for browser WebViews
+        completionRedirectUri: isMobileWebView && !isNativeApp ? completionRedirectUri : undefined
       });
       logger.info("[PLAID] Link token created successfully");
       res.json({ link_token: linkToken });
