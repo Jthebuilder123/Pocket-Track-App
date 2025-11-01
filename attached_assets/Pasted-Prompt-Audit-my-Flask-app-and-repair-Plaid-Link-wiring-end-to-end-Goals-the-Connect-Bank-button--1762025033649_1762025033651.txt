@@ -1,0 +1,170 @@
+Prompt:
+
+Audit my Flask app and repair Plaid Link wiring end-to-end.
+Goals: the Connect Bank button opens Plaid Link, exchanges the public_token, saves the access token, and returns to the dashboard without errors. Add logs and a smoke test.
+
+Backend (create/patch):
+
+GET /api/create_link_token → returns {link_token} using PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV. Use a stable client_user_id from the logged-in user (fallback "demo-user-123").
+
+POST /api/exchange_public_token → body { public_token } → exchange for access_token; save (encrypted) on the current user. Return {"status":"ok"}.
+
+POST /api/plaid/webhook → log events; return 200.
+
+If CSRF is enabled, exempt only /api/exchange_public_token (JSON POST) or include CSRF header in the fetch.
+
+Front-end:
+
+Find the Connect Bank button (any template/component). If it’s an <a>, keep it but also add a JS handler that:
+
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-action="connect-bank"]'); if (!el) return;
+  e.preventDefault();
+  const { link_token } = await (await fetch('/api/create_link_token')).json();
+  const handler = window.Plaid.create({
+    token: link_token,
+    onSuccess: async (public_token) => {
+      await fetch('/api/exchange_public_token', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ public_token })
+      });
+      location.href = '/';
+    }
+  });
+  handler.open();
+});
+
+
+Add data-action="connect-bank" to the button.
+
+Hardening & logging:
+
+app.logger.info around route hits and Plaid errors; mask secrets.
+
+Ensure no overlay blocks clicks near the header: if a modal/sidebar exists, set pointer-events:none when closed (add a CSS rule with /* FIX: prevent overlay from blocking clicks */).
+
+Smoke test page:
+
+Add GET /debug/smoke that renders buttons for Connect Bank, Upgrade Pro (monthly), and Logout; show inline PASS/FAIL messages as actions complete.
+
+2) Fix Subscription cancel buttons (ensure real links)
+
+Prompt:
+
+Make all “Cancel” buttons for subscriptions lead to real provider pages.
+
+Backend/Model:
+
+Ensure subscriptions table has a cancel_url column. If not, add a migration.
+
+Add a mapping for top providers to official cancel URLs:
+
+CANCEL_MAP = {
+  'netflix': 'https://www.netflix.com/cancelplan',
+  'spotify': 'https://support.spotify.com/us/article/cancel-premium/',
+  'hulu': 'https://secure.hulu.com/account',
+  'amazon prime': 'https://www.amazon.com/gp/video/ayc',
+  'apple tv': 'https://tv.apple.com/account/subscriptions',
+  'canva': 'https://www.canva.com/help/cancel-subscription/',
+  'crunchyroll': 'https://help.crunchyroll.com/hc/en-us/articles/206022363',
+  'adobe': 'https://helpx.adobe.com/manage-account.html',
+  'xbox game pass': 'https://account.microsoft.com/services'
+}
+
+
+On save/refresh of a subscription, if cancel_url is missing, infer it by normalized provider name using CANCEL_MAP. Store result.
+
+Templates/UI:
+
+Make every cancel button render as:
+
+<a class="btn btn-cancel" target="_blank" rel="noopener"
+   href="{{ sub.cancel_url or url_for('help_cancel', provider=sub.provider) }}">
+  Cancel
+</a>
+
+
+Add an internal fallback route GET /help/cancel/<provider> that shows manual steps + external link.
+
+Validation:
+
+Add a management page /admin/links-audit that lists subscriptions with missing or invalid cancel_url (non-200 on HEAD/GET). Provide a “Fix” action that writes from CANCEL_MAP.
+
+Test:
+
+Seed 5 sample subs; assert their cancel buttons open new tabs to valid URLs.
+
+3) Fix Upgrade buttons (Stripe Checkout)
+
+Prompt:
+
+Normalize pricing/upgrade to Stripe Checkout with simple links.
+
+Backend:
+
+Create/patch GET /billing/checkout (query: plan=essentials|pro, interval=monthly|yearly).
+Map to env price IDs:
+
+STRIPE_PRICE_E_MONTHLY, STRIPE_PRICE_E_YEARLY
+
+STRIPE_PRICE_P_MONTHLY, STRIPE_PRICE_P_YEARLY
+Create a Subscription Checkout Session; success_url = APP_BASE_URL + "/billing/success?sid={CHECKOUT_SESSION_ID}", cancel_url = APP_BASE_URL + "/pricing". Redirect 303 to session.url.
+
+POST /stripe/webhook: on checkout.session.completed, set users.plan; on customer.subscription.deleted, downgrade to free.
+
+Optional GET /billing/portal for customer portal.
+
+Front-end:
+
+Replace JS-only handlers with plain anchors:
+
+<a class="btn" href="/billing/checkout?plan=pro&interval=monthly">Upgrade to Pro</a>
+<a class="btn" href="/billing/checkout?plan=essentials&interval=yearly">Go Essentials (Yearly)</a>
+
+
+Logs: Log chosen plan, interval, and price ID.
+
+4) Add Logout (GET + POST) and general clickability guard
+
+Prompt:
+
+Make Logout work for both GET and POST; add clickability guard.
+
+Backend:
+
+@app.route('/logout', methods=['GET','POST'])
+def logout():
+    session.clear()
+    return redirect(url_for('home'))
+
+
+Front-end:
+
+Ensure there is either <a href="/logout">Logout</a> or a <form method="POST" action="/logout">.
+
+Add delegated click handler safety-net:
+
+(function(){
+  document.addEventListener('click', (e)=>{
+    const a = e.target.closest('a[data-navigate]');
+    if (a) { e.preventDefault(); window.location = a.href || a.dataset.href; }
+  }, {capture:true});
+})();
+
+
+Fix any overlay that may block header clicks: when closed, apply pointer-events:none; opacity:0; to the overlay element.
+
+Smoke test: Ensure /debug/smoke shows green checks for Connect Bank, Upgrade, and Logout.
+
+What “done” looks like
+
+Connect Bank opens Plaid Link, exchanges token, lands back on dashboard.
+
+Cancel buttons always go to a real provider page (or a helpful internal fallback).
+
+Upgrade buttons are plain links that land in Stripe Checkout and update plan on webhook.
+
+Logout works via link or form.
+
+/debug/smoke page passes all three buttons.
