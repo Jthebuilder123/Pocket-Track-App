@@ -1,0 +1,254 @@
+My stack is Express.js + TypeScript (server) and React (client).
+Repair Plaid Link end-to-end so the Connect Bank button works reliably. Create/patch the following with // FIX: PLAID comments.
+
+Server (TypeScript, e.g. src/server/plaid.ts + src/server/index.ts):
+
+Add envs: PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV (sandbox/development/production), APP_BASE_URL.
+
+Add routes:
+
+// src/server/plaid.ts
+import express from 'express';
+import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
+export const plaidRouter = express.Router();
+const cfg = new Configuration({ basePath: PlaidEnvironments[process.env.PLAID_ENV as keyof typeof PlaidEnvironments], baseOptions: { headers: { 'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID!, 'PLAID-SECRET': process.env.PLAID_SECRET! } }});
+const plaid = new PlaidApi(cfg);
+
+plaidRouter.get('/create_link_token', async (req, res) => {
+  const userId = (req as any).user?.id ?? 'demo-user-123';
+  const r = await plaid.linkTokenCreate({
+    user: { client_user_id: String(userId) },
+    client_name: 'PocketTrack',
+    language: 'en',
+    country_codes: ['US'],
+    products: ['transactions'],
+    webhook: `${process.env.APP_BASE_URL}/api/plaid/webhook`,
+    redirect_uri: `${process.env.APP_BASE_URL}/plaid/return`
+  });
+  res.json({ link_token: r.data.link_token });
+});
+
+plaidRouter.post('/exchange_public_token', express.json(), async (req, res) => {
+  const { public_token } = req.body;
+  if (!public_token) return res.status(400).json({ error: 'missing public_token' });
+  const r = await plaid.itemPublicTokenExchange({ public_token });
+  // TODO: encrypt and persist r.data.access_token to user (e.g., prisma.user.update)
+  res.json({ status: 'ok' });
+});
+
+plaidRouter.post('/webhook', express.json(), async (req, res) => {
+  console.log('PLAID WEBHOOK', req.body?.webhook_type, req.body?.webhook_code);
+  res.sendStatus(200);
+});
+
+
+In src/server/index.ts:
+
+import { plaidRouter } from './plaid';
+app.use('/api/plaid', plaidRouter);
+
+
+Client (React):
+
+Install: @plaid/react-plaid-link.
+
+Create a hook component that fetches a link token and opens Link:
+
+// src/client/components/ConnectBankButton.tsx
+import React from 'react';
+import { usePlaidLink } from '@plaid/react-plaid-link';
+
+export default function ConnectBankButton() {
+  const [token, setToken] = React.useState<string>();
+  React.useEffect(() => { fetch('/api/plaid/create_link_token').then(r=>r.json()).then(d=>setToken(d.link_token)); }, []);
+  const onSuccess = async (public_token: string) => {
+    await fetch('/api/plaid/exchange_public_token', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ public_token }) });
+    window.location.href = '/';
+  };
+  const { open, ready } = usePlaidLink({ token, onSuccess });
+  return <button data-action="connect-bank" className="btn" onClick={()=>open()} disabled={!ready}>Connect bank</button>;
+}
+
+
+Use <ConnectBankButton/> wherever the button lives.
+
+Guard against click blockers: add CSS to ensure no hidden overlay blocks clicks:
+
+/* FIX: prevent hidden overlays from eating clicks */
+.overlay.hidden { pointer-events: none !important; opacity: 0 !important; }
+
+
+Smoke Test: add a /debug/smoke client page with a Connect Bank button and display success/failure inline.
+
+2) Fix Subscription “Cancel” buttons (real links + fallback)
+
+Replit AI Prompt:
+
+Add reliable Cancel links for subscriptions. Stack: Express TS + React + (likely) Prisma or similar.
+
+Server:
+
+Ensure the subscription model has a cancelUrl field; if not, create a migration to add it (VARCHAR).
+
+Add a lookup map and a normalizer:
+
+// src/server/cancelMap.ts
+export const CANCEL_MAP: Record<string,string> = {
+  'netflix': 'https://www.netflix.com/cancelplan',
+  'spotify': 'https://support.spotify.com/us/article/cancel-premium/',
+  'hulu': 'https://secure.hulu.com/account',
+  'prime': 'https://www.amazon.com/gp/video/ayc',
+  'apple tv': 'https://tv.apple.com/account/subscriptions',
+  'canva': 'https://www.canva.com/help/cancel-subscription/',
+  'crunchyroll': 'https://help.crunchyroll.com/hc/en-us/articles/206022363',
+  'adobe': 'https://helpx.adobe.com/manage-account.html',
+  'xbox game pass': 'https://account.microsoft.com/services'
+};
+export const norm = (s:string)=> s.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+
+
+When creating/updating a subscription, if cancelUrl empty, autofill from CANCEL_MAP[norm(provider)].
+
+Add an admin audit route GET /api/links/audit that returns subs with missing/invalid cancelUrl.
+
+Client:
+
+Render cancel buttons as real anchors opening in a new tab:
+
+<a className="btn btn-cancel" target="_blank" rel="noopener"
+   href={sub.cancelUrl ?? `/help/cancel/${encodeURIComponent(sub.provider)}`}>
+  Cancel
+</a>
+
+
+Add a fallback page /help/cancel/:provider that shows manual steps plus the external link from CANCEL_MAP.
+
+Test: seed 5 sample providers and verify buttons navigate to valid URLs.
+
+3) Fix Upgrade buttons (Stripe Checkout) + webhook
+
+Replit AI Prompt:
+
+Normalize Stripe upgrade to simple links. Stack: Express TS server + React client.
+Add envs: STRIPE_SECRET_KEY, APP_BASE_URL, and price IDs:
+STRIPE_PRICE_E_MONTHLY, STRIPE_PRICE_E_YEARLY, STRIPE_PRICE_P_MONTHLY, STRIPE_PRICE_P_YEARLY.
+
+Server (src/server/billing.ts):
+
+import express from 'express';
+import Stripe from 'stripe';
+export const billing = express.Router();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' as any });
+
+const PRICE_MAP: Record<string,string> = {
+  'essentials:monthly': process.env.STRIPE_PRICE_E_MONTHLY!,
+  'essentials:yearly':  process.env.STRIPE_PRICE_E_YEARLY!,
+  'pro:monthly':        process.env.STRIPE_PRICE_P_MONTHLY!,
+  'pro:yearly':         process.env.STRIPE_PRICE_P_YEARLY!,
+};
+
+billing.get('/checkout', async (req, res) => {
+  const { plan='pro', interval='monthly' } = req.query as any;
+  const price = PRICE_MAP[`${plan}:${interval}`];
+  if (!price) return res.status(400).send('Invalid plan/interval');
+  const user = (req as any).user || { id: 'demo-1', email: 'demo@example.com' };
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    customer_email: user.email,
+    line_items: [{ price, quantity: 1 }],
+    success_url: `${process.env.APP_BASE_URL}/billing/success?sid={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.APP_BASE_URL}/pricing`
+  });
+  res.redirect(303, session.url!);
+});
+
+billing.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  const sig = req.headers['stripe-signature'] as string;
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+  } catch (err:any) { console.error('Stripe webhook error', err.message); return res.sendStatus(400); }
+  if (event.type === 'checkout.session.completed') {
+    const s = event.data.object as Stripe.Checkout.Session;
+    // TODO: set user plan based on s
+  } else if (event.type === 'customer.subscription.deleted') {
+    // TODO: downgrade user to 'free'
+  }
+  res.sendStatus(200);
+});
+
+
+In src/server/index.ts: app.use('/billing', billing);
+
+Client (React): replace JS handlers with plain links:
+
+<a className="btn" href="/billing/checkout?plan=pro&interval=monthly">Upgrade to Pro</a>
+<a className="btn" href="/billing/checkout?plan=essentials&interval=yearly">Essentials – Yearly</a>
+
+
+Note: set webhook route to express.raw before any express.json() middleware for that path.
+
+4) Fix Logout (session/JWT) + “clickability” issues
+
+Replit AI Prompt:
+
+Add robust logout (GET + POST) and remove UI blockers that eat clicks.
+
+Server (Express TS):
+
+app.post('/api/auth/logout', (req,res)=>{ req.session?.destroy(()=>{}); res.clearCookie('sid'); res.json({ok:true}); });
+app.get('/logout', (req,res)=>{ req.session?.destroy(()=>{}); res.clearCookie('sid'); res.redirect('/'); });
+
+
+(If using JWT, just clear the token client-side.)
+
+Client:
+
+<a href="/logout" className="text-sm">Logout</a>
+
+
+CSS/JS guard:
+
+.modal[aria-hidden="true"], .drawer[aria-hidden="true"] { pointer-events:none !important; opacity:0 !important; }
+
+
+Add a delegated click handler to ensure buttons fire even if nested in icons:
+
+document.addEventListener('click', (e:any)=>{
+  const el = e.target.closest('[data-action]');
+  if(!el) return;
+  if(el.dataset.action==='connect-bank'){ e.preventDefault(); /* call Plaid open() if present */ }
+}, {capture:true});
+
+(Optional) All-in-one consolidated prompt
+
+Replit AI Prompt (single run):
+
+Stack: Express.js + TypeScript (server) + React (client).
+In one PR, implement these fixes with clear // FIX: comments and minimal changes:
+
+Plaid: add /api/plaid/create_link_token, /api/plaid/exchange_public_token, /api/plaid/webhook (TS); React component <ConnectBankButton/> using @plaid/react-plaid-link.
+
+Cancel: ensure subscriptions.cancelUrl exists; add CANCEL_MAP, populate missing URLs, render cancel anchors with fallback /help/cancel/:provider, and add /api/links/audit.
+
+Stripe: add /billing/checkout (redirect to Checkout), /billing/webhook with express.raw, map plan+interval to price IDs via env; replace upgrade buttons with plain links.
+
+Logout: support GET /logout and POST /api/auth/logout; clear session/cookie.
+
+Clickability fixes: CSS to disable pointer events for hidden overlays; delegated click handler safety-net.
+
+Smoke test page /debug/smoke (client route) showing 3 buttons: Connect Bank, Upgrade Pro (monthly), Logout; display inline status after each action.
+Provide any new env keys in .env.example. Do not break existing routes. Run type checks.
+
+Env keys to add to .env.example:
+
+APP_BASE_URL=
+PLAID_CLIENT_ID=
+PLAID_SECRET=
+PLAID_ENV=sandbox
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_E_MONTHLY=
+STRIPE_PRICE_E_YEARLY=
+STRIPE_PRICE_P_MONTHLY=
+STRIPE_PRICE_P_YEARLY=
