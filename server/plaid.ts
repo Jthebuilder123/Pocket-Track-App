@@ -36,7 +36,14 @@ function ensurePlaidConfigured() {
   }
 }
 
-export const createLinkToken = async (userId: string, redirectUri?: string) => {
+export const createLinkToken = async (
+  userId: string, 
+  options?: { 
+    redirectUri?: string;
+    isMobileWebView?: boolean;
+    completionRedirectUri?: string;
+  }
+) => {
   ensurePlaidConfigured();
   
   const config: any = {
@@ -49,16 +56,28 @@ export const createLinkToken = async (userId: string, redirectUri?: string) => {
     language: 'en',
   };
   
-  // Add redirect_uri for mobile OAuth flow
-  // NOTE: In production, redirect_uri must be registered in Plaid Dashboard
-  // In sandbox, any redirect_uri can be used dynamically
-  if (redirectUri) {
-    config.redirect_uri = redirectUri;
+  // Hosted Link for mobile WebViews (React Native, Cordova, etc.)
+  // Opens in native browser (ASWebAuthenticationSession/Custom Tabs)
+  if (options?.isMobileWebView && options?.completionRedirectUri) {
+    config.hosted_link = {
+      is_mobile_app: true,
+      completion_redirect_uri: options.completionRedirectUri,
+    };
+    logger.info('[PLAID] Creating Hosted Link token for mobile WebView', { 
+      environment: PLAID_ENV,
+      completionRedirectUri: options.completionRedirectUri.substring(0, 50) + '...'
+    });
+  }
+  // Standard OAuth redirect for mobile browsers
+  else if (options?.redirectUri) {
+    config.redirect_uri = options.redirectUri;
     logger.info('[PLAID] Creating link token with redirect URI for mobile OAuth', { 
       environment: PLAID_ENV,
-      redirectUri: redirectUri.substring(0, 50) + '...' 
+      redirectUri: options.redirectUri.substring(0, 50) + '...' 
     });
-  } else {
+  } 
+  // Modal flow for desktop browsers
+  else {
     logger.info('[PLAID] Creating link token for modal flow (no redirect URI)', {
       environment: PLAID_ENV
     });
@@ -71,7 +90,8 @@ export const createLinkToken = async (userId: string, redirectUri?: string) => {
     logger.error('[PLAID] Failed to create link token', {
       error: error.message,
       response: error.response?.data,
-      hasRedirectUri: !!redirectUri,
+      hasRedirectUri: !!options?.redirectUri,
+      isMobileWebView: !!options?.isMobileWebView,
       environment: PLAID_ENV
     });
     throw error;

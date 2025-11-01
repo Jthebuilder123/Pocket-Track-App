@@ -1114,13 +1114,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user!.claims.sub || "demo-user-123"; // Fallback for testing
       const redirectUri = req.query.redirect_uri as string | undefined;
+      const isMobileWebView = req.query.is_mobile_webview === 'true';
+      const completionRedirectUri = req.query.completion_redirect_uri as string | undefined;
       
       logger.info("[PLAID] Creating link token", { 
         userId: userId.substring(0, 8) + "...",
-        hasRedirectUri: !!redirectUri 
+        hasRedirectUri: !!redirectUri,
+        isMobileWebView,
+        hasCompletionRedirectUri: !!completionRedirectUri
       });
       
-      const linkToken = await createLinkToken(userId, redirectUri);
+      const linkToken = await createLinkToken(userId, {
+        redirectUri,
+        isMobileWebView,
+        completionRedirectUri
+      });
       logger.info("[PLAID] Link token created successfully");
       res.json({ link_token: linkToken });
     } catch (error: any) {
@@ -1239,7 +1247,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/plaid/create-link-token", requireAuth, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub;
-      const linkToken = await createLinkToken(userId);
+      const { redirect_uri, is_mobile_webview, completion_redirect_uri } = req.body;
+      
+      const linkToken = await createLinkToken(userId, {
+        redirectUri: redirect_uri,
+        isMobileWebView: is_mobile_webview,
+        completionRedirectUri: completion_redirect_uri
+      });
       res.json({ link_token: linkToken });
     } catch (error: any) {
       logger.error("Error creating link token", { error });
@@ -1251,6 +1265,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.status(500).json({ error: "Failed to create link token" });
     }
+  });
+
+  // Temporary storage for Hosted Link callbacks (keyed by user ID)
+  // Cleared after WebView retrieves the result
+  const hostedLinkCallbacks = new Map<string, any>();
+
+  // Plaid Hosted Link completion callback
+  // This endpoint handles the redirect from Plaid's Hosted Link
+  app.get("/plaid/callback", requireAuth, (req: any, res: any) => {
+    const userId = req.user?.claims?.sub;
+    
+    logger.info("[PLAID] Hosted Link callback received", { 
+      userId: userId?.substring(0, 8) + "...",
+      hasPublicToken: !!req.query.public_token,
+      hasError: !!req.query.error,
+      query: Object.keys(req.query)
+    });
+    
+    // Extract parameters from query string
+    const publicToken = req.query.public_token as string | undefined;
+    const linkSessionId = req.query.link_session_id as string | undefined;
+    const error = req.query.error as string | undefined;
+    const errorMessage = req.query.error_message as string | undefined;
+    
+    // Store callback result server-side (keyed by user ID)
+    // This survives the native browser → WebView boundary
+    if (userId) {
+      hostedLinkCallbacks.set(userId, {
+        publicToken,
+        error,
+        errorMessage,
+        linkSessionId,
+        timestamp: Date.now()
+      });
+      logger.info("[PLAID] Stored callback result for user", { userId: userId.substring(0, 8) + "..." });
+    }
+    
+    // Serve an HTML page that will communicate with the WebView
+    // and close the native browser
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Plaid Link Complete</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          }
+          .container {
+            text-align: center;
+            padding: 2rem;
+          }
+          .success-icon, .error-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+          }
+          h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+          }
+          p {
+            margin: 0;
+            opacity: 0.9;
+          }
+          .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto 0;
+          }
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          ${publicToken ? `
+            <div class="success-icon">✓</div>
+            <h1>Bank Connected!</h1>
+            <p>Returning to app...</p>
+          ` : error ? `
+            <div class="error-icon">✕</div>
+            <h1>Connection ${error === 'user_exited' ? 'Cancelled' : 'Failed'}</h1>
+            <p>${errorMessage || 'Please try again'}</p>
+            <div class="spinner"></div>
+          ` : `
+            <h1>Processing...</h1>
+            <div class="spinner"></div>
+          `}
+        </div>
+        
+        <script>
+          // Try to communicate with React Native WebView
+          if (window.ReactNativeWebView) {
+            const data = {
+              type: 'plaid_callback',
+              publicToken: '${publicToken || ''}',
+              error: '${error || ''}',
+              errorMessage: '${errorMessage || ''}',
+              linkSessionId: '${linkSessionId || ''}'
+            };
+            window.ReactNativeWebView.postMessage(JSON.stringify(data));
+          }
+          
+          // Try to communicate with Cordova/Capacitor
+          if (window.cordova || window.Capacitor) {
+            window.location.href = 'pockettrack://plaid-callback?public_token=${publicToken || ''}&error=${error || ''}';
+          }
+          
+          // Auto-close after 2 seconds
+          // Result is stored server-side and WebView will poll for it
+          ${publicToken ? `
+            setTimeout(() => {
+              window.close();
+              // If close doesn't work, try to navigate back
+              if (!window.closed) {
+                window.location.href = '/';
+              }
+            }, 2000);
+          ` : error ? `
+            // On error, close after 3 seconds
+            setTimeout(() => {
+              window.close();
+              if (!window.closed) {
+                window.location.href = '/';
+              }
+            }, 3000);
+          ` : ''}
+        </script>
+      </body>
+      </html>
+    `);
+  });
+
+  // Check for pending Hosted Link callback (WebView polls this after returning from native browser)
+  app.get("/api/plaid/callback-result", requireAuth, (req: any, res: any) => {
+    const userId = req.user!.claims.sub;
+    
+    // Check if there's a pending callback for this user
+    const callbackResult = hostedLinkCallbacks.get(userId);
+    
+    if (callbackResult) {
+      // Clear the result after retrieving it (one-time use)
+      hostedLinkCallbacks.delete(userId);
+      
+      logger.info("[PLAID] Callback result retrieved by WebView", { 
+        userId: userId.substring(0, 8) + "...",
+        hasPublicToken: !!callbackResult.publicToken 
+      });
+      
+      return res.json({
+        found: true,
+        publicToken: callbackResult.publicToken,
+        error: callbackResult.error,
+        errorMessage: callbackResult.errorMessage,
+        linkSessionId: callbackResult.linkSessionId
+      });
+    }
+    
+    // No callback pending
+    res.json({ found: false });
   });
 
   // Exchange public token for access token and save bank connection

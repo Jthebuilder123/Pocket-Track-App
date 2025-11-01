@@ -104,6 +104,111 @@
       }
     </script>
     
+    <!-- Plaid Hosted Link Callback Handler -->
+    <script>
+      // Handle return from Hosted Link (mobile WebView flow)
+      // Poll server for callback result (survives native browser → WebView boundary)
+      
+      let isProcessingCallback = false;
+      
+      async function checkPlaidCallback() {
+        // Prevent duplicate processing
+        if (isProcessingCallback) {
+          console.log('[PLAID-CALLBACK] Already processing callback, skipping...');
+          return;
+        }
+        
+        console.log('[PLAID-CALLBACK] Checking server for callback result...');
+        
+        try {
+          // Poll server for callback result (stored server-side by /plaid/callback)
+          const response = await fetch('/api/plaid/callback-result', {
+            credentials: 'include'
+          });
+          
+          if (!response.ok) {
+            console.log('[PLAID-CALLBACK] Not authenticated or error checking callback');
+            return;
+          }
+          
+          const result = await response.json();
+          
+          if (result.found) {
+            console.log('[PLAID-CALLBACK] Detected Hosted Link callback result from server');
+            isProcessingCallback = true;
+            
+            try {
+              if (result.publicToken) {
+                console.log('[PLAID-CALLBACK] Processing successful bank connection');
+                
+                // Exchange public token for access token
+                const exchangeResponse = await fetch('/api/exchange_public_token', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({ public_token: result.publicToken })
+                });
+                
+                if (!exchangeResponse.ok) {
+                  throw new Error('Failed to exchange token');
+                }
+                
+                console.log('[PLAID-CALLBACK] Token exchanged successfully');
+                
+                // Get return path and redirect
+                const returnPath = sessionStorage.getItem('plaid_return_path') || '/';
+                sessionStorage.removeItem('plaid_return_path');
+                
+                // Show success message
+                alert('Bank connected successfully!');
+                
+                // Reload to show updated data
+                window.location.href = returnPath;
+              } else if (result.error) {
+                console.log('[PLAID-CALLBACK] Bank connection failed or cancelled:', result.error);
+                
+                if (result.error !== 'user_exited') {
+                  alert(`Bank connection failed: ${result.errorMessage || result.error}`);
+                }
+                
+                // Clear return path
+                sessionStorage.removeItem('plaid_return_path');
+              }
+            } catch (error) {
+              console.error('[PLAID-CALLBACK] Error processing callback result:', error);
+              sessionStorage.removeItem('plaid_return_path');
+            } finally {
+              isProcessingCallback = false;
+            }
+          } else {
+            console.log('[PLAID-CALLBACK] No pending callback found on server');
+          }
+        } catch (error) {
+          console.error('[PLAID-CALLBACK] Error checking callback:', error);
+        }
+      }
+      
+      // Run immediately when script loads
+      checkPlaidCallback();
+      
+      // Also check when page loads
+      window.addEventListener('load', checkPlaidCallback);
+      
+      // CRITICAL: Check when WebView regains focus after native browser closes
+      window.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+          console.log('[PLAID-CALLBACK] WebView became visible, checking for callback...');
+          checkPlaidCallback();
+        }
+      });
+      
+      // Additional fallback for when window regains focus
+      window.addEventListener('focus', function() {
+        console.log('[PLAID-CALLBACK] Window focused, checking for callback...');
+        checkPlaidCallback();
+      });
+    </script>
+    
     <!-- Plaid Link Event Handler -->
     <script>
       console.log('[PLAID-LINK] Attaching event handler for Connect Bank buttons...');
@@ -312,27 +417,35 @@
           // Fetch link token from backend
           console.log('[PLAID-LINK] Fetching link token...');
           
-          // For mobile, use the registered root URL as redirect_uri (must match Plaid Dashboard)
-          // Store current page to return to after OAuth completes
-          let redirectUri = null;
-          if (isMobile) {
-            // Use the registered redirect URI from Plaid Dashboard
-            const baseUrl = window.location.origin;
-            redirectUri = `${baseUrl}/`;
+          // For mobile WebViews, use Hosted Link (opens in native browser)
+          // For mobile browsers and desktop, use standard Link (modal or redirect)
+          const isMobileWebView = DEVICE_CONTEXT.isMobileWebView;
+          const baseUrl = window.location.origin;
+          
+          let linkTokenUrl;
+          
+          if (isMobileWebView) {
+            // Mobile WebView: Use Hosted Link with completion redirect
+            const completionRedirectUri = `${baseUrl}/plaid/callback`;
+            linkTokenUrl = `/api/create_link_token?is_mobile_webview=true&completion_redirect_uri=${encodeURIComponent(completionRedirectUri)}`;
+            console.log('[PLAID-LINK] Using Hosted Link for mobile WebView', { completionRedirectUri });
+          } else if (isMobile) {
+            // Mobile browser: Use standard OAuth redirect
+            const redirectUri = `${baseUrl}/`;
+            linkTokenUrl = `/api/create_link_token?redirect_uri=${encodeURIComponent(redirectUri)}`;
             
-            // Store the current page so we can return to it after OAuth
+            // Store current page to return to after OAuth
             const currentPath = window.location.pathname;
             if (currentPath && currentPath !== '/') {
               sessionStorage.setItem('plaid_return_path', currentPath);
               console.log('[PLAID-LINK] Stored return path:', currentPath);
             }
+            console.log('[PLAID-LINK] Using OAuth redirect for mobile browser', { redirectUri });
+          } else {
+            // Desktop: Use modal mode
+            linkTokenUrl = '/api/create_link_token';
+            console.log('[PLAID-LINK] Using modal mode for desktop');
           }
-          
-          const linkTokenUrl = redirectUri 
-            ? `/api/create_link_token?redirect_uri=${encodeURIComponent(redirectUri)}`
-            : '/api/create_link_token';
-          
-          console.log('[PLAID-LINK] Requesting link token with redirect URI:', redirectUri);
           
           const linkTokenResponse = await fetch(linkTokenUrl, {
             credentials: 'include'
@@ -349,15 +462,43 @@
           }
           
           const { link_token } = await linkTokenResponse.json();
-          console.log('[PLAID-LINK] Link token received', { isMobile, redirectUri });
+          console.log('[PLAID-LINK] Link token received', { isMobileWebView, isMobile });
           
-          // Store link token in sessionStorage for OAuth redirect resume (mobile only)
-          if (isMobile && redirectUri) {
+          // Mobile WebView: Use Hosted Link (opens in native browser)
+          if (isMobileWebView) {
+            const hostedLinkUrl = `https://cdn.plaid.com/link/v2/stable/link.html?token=${link_token}`;
+            console.log('[PLAID-LINK] Opening Hosted Link in native browser');
+            
+            // Store current page for return
+            sessionStorage.setItem('plaid_return_path', window.location.pathname);
+            
+            // Open in native browser (ASWebAuthenticationSession on iOS, Custom Tabs on Android)
+            const linkWindow = window.open(hostedLinkUrl, '_blank');
+            
+            // If window.open fails, provide fallback
+            if (!linkWindow || linkWindow.closed || typeof linkWindow.closed == 'undefined') {
+              console.error('[PLAID-LINK] Popup blocked - trying direct navigation');
+              window.location.href = hostedLinkUrl;
+            }
+            
+            // Re-enable button
+            if (textSpan) {
+              textSpan.textContent = originalText;
+            } else {
+              el.textContent = originalText;
+            }
+            el.disabled = false;
+            
+            return; // Exit here - callback will handle the rest
+          }
+          
+          // Store link token in sessionStorage for OAuth redirect resume (mobile browser only)
+          if (isMobile) {
             sessionStorage.setItem('plaid_link_token', link_token);
             console.log('[PLAID-LINK] Stored link token in sessionStorage for OAuth resume');
           }
           
-          // Create and open Plaid Link
+          // Create and open standard Plaid Link (modal or redirect mode)
           const plaidConfig = {
             token: link_token,
             onSuccess: async (public_token, metadata) => {
