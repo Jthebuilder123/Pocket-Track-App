@@ -167,7 +167,7 @@ export function DashboardPage() {
   };
 
   const handleAddNew = () => {
-    // Check if user can add more subscriptions
+    // For authenticated users: check plan limits from server
     if (userPlan && !userPlan.subscriptions.canAdd) {
       const limit = userPlan.subscriptions.max;
       toast({
@@ -182,6 +182,26 @@ export function DashboardPage() {
             data-testid="button-upgrade-toast"
           >
             Upgrade
+          </Button>
+        ),
+      });
+      return;
+    }
+
+    // For guest users: enforce Free tier limit (10 subscriptions)
+    if (isGuest && subscriptions.length >= 10) {
+      toast({
+        title: "Subscription Limit Reached",
+        description: "You've reached the maximum of 10 subscriptions as a guest. Sign up for a free account to continue tracking more subscriptions.",
+        variant: "destructive",
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setLocation("/login")}
+            data-testid="button-signup-toast"
+          >
+            Sign Up Free
           </Button>
         ),
       });
@@ -211,20 +231,22 @@ export function DashboardPage() {
   };
 
   const exportToCSV = () => {
-    // Check if user has export permission
-    if (!userPlan?.features?.exportData) {
+    // Check if user has export permission (guests and Free users cannot export)
+    if (isGuest || !userPlan?.features?.exportData) {
       toast({
         title: "Upgrade Required",
-        description: "Export features are available on Essentials and Pro plans. Upgrade to export your data.",
+        description: isGuest 
+          ? "Export features require a free account. Sign up to export your data."
+          : "Export features are available on Essentials and Pro plans. Upgrade to export your data.",
         variant: "destructive",
         action: (
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => setLocation("/pricing")}
+            onClick={() => setLocation(isGuest ? "/login" : "/pricing")}
             data-testid="button-upgrade-toast"
           >
-            Upgrade
+            {isGuest ? "Sign Up Free" : "Upgrade"}
           </Button>
         ),
       });
@@ -273,20 +295,22 @@ export function DashboardPage() {
   };
 
   const exportToJSON = () => {
-    // Check if user has export permission
-    if (!userPlan?.features?.exportData) {
+    // Check if user has export permission (guests and Free users cannot export)
+    if (isGuest || !userPlan?.features?.exportData) {
       toast({
         title: "Upgrade Required",
-        description: "Export features are available on Essentials and Pro plans. Upgrade to export your data.",
+        description: isGuest 
+          ? "Export features require a free account. Sign up to export your data."
+          : "Export features are available on Essentials and Pro plans. Upgrade to export your data.",
         variant: "destructive",
         action: (
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => setLocation("/pricing")}
+            onClick={() => setLocation(isGuest ? "/login" : "/pricing")}
             data-testid="button-upgrade-toast"
           >
-            Upgrade
+            {isGuest ? "Sign Up Free" : "Upgrade"}
           </Button>
         ),
       });
