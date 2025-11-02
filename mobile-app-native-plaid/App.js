@@ -13,12 +13,17 @@ export default function App() {
   const webViewRef = useRef(null);
   const [linkToken, setLinkToken] = useState(null);
   
-  // FIX: PLAID - Handle deep linking from Plaid redirect
+  // FIX: EXTERNAL LINKS - Handle deep linking returns from system browser
   useEffect(() => {
     const handleDeepLink = (event) => {
-      console.log('[PLAID-MOBILE] Deep link received:', event.url);
-      if (event.url.includes('pockettrack://plaid-redirect')) {
-        console.log('[PLAID-MOBILE] Plaid redirect detected');
+      console.log('[MOBILE] Deep link received:', event.url);
+      
+      // FIX: Refresh WebView when returning from external browser
+      if (event.url.startsWith('pockettrack://')) {
+        console.log('[MOBILE] Returning from external browser, refreshing WebView');
+        
+        // Reload the WebView to show updated state
+        webViewRef.current?.reload();
       }
     };
 
@@ -140,12 +145,41 @@ export default function App() {
     return true;
   };
 
-  // Determine if URL should open in external browser
+  // FIX: EXTERNAL LINKS - Determine if URL should open in external browser
   const shouldOpenExternally = (url) => {
-    // FIX: PLAID - Don't open plaid.com in external browser anymore (using native SDK)
+    // Don't intercept our own domain
+    if (url.startsWith(POCKETTRACK_URL)) {
+      return false;
+    }
     
-    // Stripe checkout and billing links
-    if (url.includes('checkout.stripe.com') || url.includes('/billing/checkout')) {
+    // FIX: STRIPE - Open Stripe checkout and billing in system browser
+    if (url.includes('checkout.stripe.com') || 
+        url.includes('billing.stripe.com') ||
+        url.includes('/billing/checkout')) {
+      console.log('[MOBILE] Opening Stripe checkout in system browser:', url);
+      return true;
+    }
+    
+    // FIX: CANCELLATION LINKS - Open provider cancellation pages in system browser
+    if (url.includes('/cancel') && !url.startsWith(POCKETTRACK_URL)) {
+      console.log('[MOBILE] Opening cancellation link in system browser:', url);
+      return true;
+    }
+    
+    // Open any external domain (not our app) in system browser
+    if (url.startsWith('http') && !url.startsWith(POCKETTRACK_URL)) {
+      // But allow common CDNs and auth providers in WebView
+      const allowedInWebView = [
+        'cdn.plaid.com',  // Keep for fallback
+        'fonts.googleapis.com',
+        'fonts.gstatic.com',
+      ];
+      
+      if (allowedInWebView.some(domain => url.includes(domain))) {
+        return false;
+      }
+      
+      console.log('[MOBILE] Opening external link in system browser:', url);
       return true;
     }
     
@@ -165,13 +199,39 @@ export default function App() {
     return true; // Load in WebView
   };
 
-  // Inject JavaScript to detect WebView environment and intercept Plaid
+  // FIX: Inject JavaScript to detect WebView environment and intercept Plaid
   const injectedJavaScript = `
     (function() {
       // Mark as React Native WebView for detection
       window.ReactNativeWebView = true;
       
-      // Override Plaid Link creation to use native SDK
+      // FIX: OVERLAY - Add CSS to prevent overlays from blocking clicks
+      const injectOverlayFixes = () => {
+        const style = document.createElement('style');
+        style.textContent = \`
+          /* FIX: Prevent hidden overlays from blocking clicks */
+          .overlay[aria-hidden="true"], 
+          .drawer[aria-hidden="true"],
+          [data-state="closed"],
+          [data-state="hidden"] {
+            pointer-events: none !important;
+            opacity: 0 !important;
+            visibility: hidden !important;
+          }
+          
+          /* Ensure visible overlays work correctly */
+          .overlay[aria-hidden="false"],
+          .drawer[aria-hidden="false"],
+          [data-state="open"],
+          [data-state="visible"] {
+            pointer-events: auto !important;
+          }
+        \`;
+        document.head.appendChild(style);
+        console.log('[MOBILE] Overlay click-blocking fixes injected');
+      };
+      
+      // FIX: PLAID - Override Plaid Link creation to use native SDK
       const checkAndOverridePlaid = () => {
         if (window.Plaid && window.Plaid.create) {
           const originalPlaidCreate = window.Plaid.create;
@@ -200,9 +260,13 @@ export default function App() {
       
       // Start checking after page loads
       if (document.readyState === 'complete') {
+        injectOverlayFixes();
         checkAndOverridePlaid();
       } else {
-        window.addEventListener('load', checkAndOverridePlaid);
+        window.addEventListener('load', () => {
+          injectOverlayFixes();
+          checkAndOverridePlaid();
+        });
       }
       
       // Also check on DOM changes
