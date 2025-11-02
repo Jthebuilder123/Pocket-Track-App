@@ -1110,7 +1110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== Plaid Bank Integration Routes =====
 
   // GET /api/create_link_token - Simplified route for vanilla JS frontend (no CSRF needed for GET)
-  app.get("/api/create_link_token", requireAuth, async (req: any, res: any) => {
+  app.get("/api/create_link_token", requireAuth, checkBankConnectionLimit, async (req: any, res: any) => {
     try {
       const userId = req.user!.claims.sub || "demo-user-123"; // Fallback for testing
       const redirectUri = req.query.redirect_uri as string | undefined;
