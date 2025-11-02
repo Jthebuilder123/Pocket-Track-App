@@ -3,6 +3,22 @@
 ## Overview
 PocketTrack is a modern web application designed to help users efficiently track and manage their recurring subscriptions across web and native mobile platforms. It provides tools for monitoring spending, visualizing costs by category, and staying informed about upcoming renewals. The project aims to offer a comprehensive solution for personal finance management focused on subscription services. It is available as a Progressive Web App (PWA) and native iOS/Android applications.
 
+## Plan-Tier Enforcement (Updated: Nov 2, 2025)
+PocketTrack enforces feature restrictions based on subscription tier (Free/Essentials/Pro) with both server-side and client-side validation:
+
+### Server-Side Enforcement
+- **Webhooks**: All webhook routes (GET, POST, PUT, DELETE) require authentication and Pro plan via `requireFeature("webhooks")` middleware
+- **Bank Connections**: POST routes check bank connection limits via `checkBankConnectionLimit` middleware (Free: 1, Essentials: 3, Pro: unlimited)
+- **Subscriptions**: POST routes check subscription limits via `checkSubscriptionLimit` middleware (Free: 10, Essentials: 25, Pro: unlimited)
+- **Returns HTTP 403** with clear upgrade message when limits exceeded
+
+### Client-Side Enforcement
+- **Export Features**: CSV/JSON export blocked for Free users, shows upgrade prompt with action button
+- **Bank Connect**: Button disabled when limit reached, shows usage counter and upgrade prompt
+- **Add Subscription**: Blocked when limit reached, shows upgrade toast
+- **Visual Indicators**: Lock icons, Crown badges, and disabled states show locked features
+- **Upgrade Prompts**: All restricted actions show actionable upgrade buttons linking to /pricing
+
 ## User Preferences
 - Clean, modern SaaS dashboard aesthetic
 - Linear + Notion inspired design

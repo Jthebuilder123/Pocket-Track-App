@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText, LogOut, LogIn, User, Upload, Crown } from "lucide-react";
+import { Plus, TrendingUp, DollarSign, CreditCard, Calendar, Search, SlidersHorizontal, Download, FileJson, FileText, LogOut, LogIn, User, Upload, Crown, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +47,20 @@ export function DashboardPage() {
   });
 
   // Get user's current plan
-  const { data: userPlan } = useQuery<{ plan: string }>({
+  const { data: userPlan } = useQuery<{ 
+    plan: string;
+    subscriptions: {
+      current: number;
+      max: number | null;
+      canAdd: boolean;
+    };
+    features: {
+      exportData: boolean;
+      importData: boolean;
+      webhooks: boolean;
+      emailNotifications: boolean;
+    };
+  }>({
     queryKey: ["/api/user/plan"],
     enabled: !!user,
   });
@@ -154,6 +167,27 @@ export function DashboardPage() {
   };
 
   const handleAddNew = () => {
+    // Check if user can add more subscriptions
+    if (userPlan && !userPlan.subscriptions.canAdd) {
+      const limit = userPlan.subscriptions.max;
+      toast({
+        title: "Subscription Limit Reached",
+        description: `You've reached the maximum of ${limit} active subscriptions on your ${userPlan.plan} plan. Upgrade to add more subscriptions.`,
+        variant: "destructive",
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setLocation("/pricing")}
+            data-testid="button-upgrade-toast"
+          >
+            Upgrade
+          </Button>
+        ),
+      });
+      return;
+    }
+
     setEditingSubscription(undefined);
     setTemplateData(undefined);
     setIsModalOpen(true);
@@ -177,6 +211,26 @@ export function DashboardPage() {
   };
 
   const exportToCSV = () => {
+    // Check if user has export permission
+    if (!userPlan?.features?.exportData) {
+      toast({
+        title: "Upgrade Required",
+        description: "Export features are available on Essentials and Pro plans. Upgrade to export your data.",
+        variant: "destructive",
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setLocation("/pricing")}
+            data-testid="button-upgrade-toast"
+          >
+            Upgrade
+          </Button>
+        ),
+      });
+      return;
+    }
+
     try {
       const headers = ["Name", "Cost", "Billing Cycle", "Category", "Next Renewal", "Status", "Notes"];
       const csvData = activeSubscriptions.map(sub => [
@@ -219,6 +273,26 @@ export function DashboardPage() {
   };
 
   const exportToJSON = () => {
+    // Check if user has export permission
+    if (!userPlan?.features?.exportData) {
+      toast({
+        title: "Upgrade Required",
+        description: "Export features are available on Essentials and Pro plans. Upgrade to export your data.",
+        variant: "destructive",
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setLocation("/pricing")}
+            data-testid="button-upgrade-toast"
+          >
+            Upgrade
+          </Button>
+        ),
+      });
+      return;
+    }
+
     try {
       const jsonData = activeSubscriptions.map(sub => ({
         name: sub.name,
@@ -313,10 +387,16 @@ export function DashboardPage() {
                 <DropdownMenuItem onClick={exportToCSV} data-testid="menuitem-export-csv">
                   <FileText className="w-4 h-4 mr-2" />
                   Export as CSV
+                  {!userPlan?.features?.exportData && (
+                    <Lock className="w-3 h-3 ml-auto text-muted-foreground" data-testid="icon-export-locked" />
+                  )}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={exportToJSON} data-testid="menuitem-export-json">
                   <FileJson className="w-4 h-4 mr-2" />
                   Export as JSON
+                  {!userPlan?.features?.exportData && (
+                    <Lock className="w-3 h-3 ml-auto text-muted-foreground" data-testid="icon-export-locked" />
+                  )}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

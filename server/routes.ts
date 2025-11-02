@@ -1665,7 +1665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== Webhook Routes =====
 
   // Get all webhooks
-  app.get("/api/webhooks", async (_req, res) => {
+  app.get("/api/webhooks", requireAuth, requireFeature("webhooks"), async (req: any, res: any) => {
     try {
       const webhooks = await storage.getAllWebhooks();
       res.json(webhooks);
@@ -1693,7 +1693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update webhook
-  app.put("/api/webhooks/:id", async (req, res) => {
+  app.put("/api/webhooks/:id", requireAuth, requireFeature("webhooks"), async (req: any, res: any) => {
     try {
       const { insertWebhookSchema } = await import("@shared/schema");
       const result = insertWebhookSchema.safeParse(req.body);
@@ -1713,7 +1713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete webhook
-  app.delete("/api/webhooks/:id", async (req, res) => {
+  app.delete("/api/webhooks/:id", requireAuth, requireFeature("webhooks"), async (req: any, res: any) => {
     try {
       const deleted = await storage.deleteWebhook(req.params.id);
       if (!deleted) {

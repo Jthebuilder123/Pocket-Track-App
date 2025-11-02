@@ -103,6 +103,24 @@ export function BankConnect() {
     enabled: !isGuest, // Only fetch if authenticated
   });
 
+  // Fetch user plan limits
+  const { data: userPlan } = useQuery<{
+    plan: string;
+    bankConnections: {
+      current: number;
+      max: number | null;
+      canAdd: boolean;
+    };
+  }>({
+    queryKey: ["/api/user/plan"],
+    enabled: !isGuest,
+  });
+
+  // Check if user can add more bank connections
+  const canAddConnection = userPlan?.bankConnections?.canAdd ?? true;
+  const connectionLimit = userPlan?.bankConnections?.max;
+  const currentConnections = userPlan?.bankConnections?.current ?? 0;
+
   // Sync transactions mutation
   const syncTransactionsMutation = useMutation({
     mutationFn: async (connectionId: string) => {
@@ -211,6 +229,31 @@ export function BankConnect() {
     );
   }
 
+  // Handle Connect Bank button click with limit checking
+  const handleConnectBank = () => {
+    if (!canAddConnection) {
+      toast({
+        title: "Bank Connection Limit Reached",
+        description: connectionLimit === 0
+          ? `Bank connections are not available on the ${userPlan?.plan} plan. Upgrade to connect your bank accounts.`
+          : `You've reached the maximum of ${connectionLimit} bank connection(s). Upgrade to connect more accounts.`,
+        variant: "destructive",
+        action: (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setLocation("/pricing")}
+            data-testid="button-upgrade-toast"
+          >
+            Upgrade
+          </Button>
+        ),
+      });
+      return;
+    }
+    // If limit not reached, the vanilla JS handler in index.html will trigger
+  };
+
   // Authenticated user UI - Bank connection handled by vanilla JS in index.html
   return (
     <div className="space-y-6">
@@ -219,14 +262,24 @@ export function BankConnect() {
           <h2 className="text-2xl font-semibold" data-testid="text-bank-title">Connected Banks</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Connect your bank to automatically detect subscriptions
+            {userPlan && (
+              <span className="ml-2 text-xs">
+                ({currentConnections}/{connectionLimit === null ? "∞" : connectionLimit} used)
+              </span>
+            )}
           </p>
         </div>
         <Button
           data-testid="button-connect-bank"
           data-action="connect-bank"
+          onClick={handleConnectBank}
+          disabled={!canAddConnection}
         >
           <Building2 className="w-4 h-4 mr-2" />
           <span>Connect Bank</span>
+          {!canAddConnection && (
+            <Crown className="w-3 h-3 ml-2" data-testid="icon-bank-locked" />
+          )}
         </Button>
       </div>
 
