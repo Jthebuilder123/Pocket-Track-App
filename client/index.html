@@ -458,6 +458,33 @@
               statusText: linkTokenResponse.statusText,
               error: errorText
             });
+            
+            // Handle bank connection limit (403 error)
+            if (linkTokenResponse.status === 403) {
+              try {
+                const errorData = JSON.parse(errorText);
+                if (errorData.message) {
+                  // Show upgrade message
+                  const upgradeMessage = errorData.message;
+                  const confirmUpgrade = confirm(`${upgradeMessage}\n\nWould you like to view upgrade options?`);
+                  if (confirmUpgrade) {
+                    window.location.href = '/pricing';
+                  }
+                  // Re-enable button
+                  if (textSpan) {
+                    textSpan.textContent = originalText;
+                  } else {
+                    el.textContent = originalText;
+                  }
+                  el.disabled = false;
+                  return; // Exit without throwing
+                }
+              } catch (parseError) {
+                // If JSON parsing fails, fall through to generic error
+                console.error('[PLAID-LINK] Failed to parse 403 error response:', parseError);
+              }
+            }
+            
             throw new Error(`Failed to create link token: ${linkTokenResponse.statusText}. ${errorText}`);
           }
           

@@ -113,11 +113,21 @@ export async function checkBankConnectionLimit(
     const userId = req.user.claims.sub;
     const user = await storage.getUser(userId);
     if (!user) {
+      logger.warn("Bank connection limit check - user not found", { userId });
       return res.status(401).json({ error: "User not found" });
     }
 
     const userPlan = user.plan as PricingTier;
     const userConnections = await storage.getBankConnectionsByUserId(user.id);
+
+    logger.info("Bank connection limit check", {
+      userId: user.id,
+      email: user.email,
+      plan: userPlan,
+      currentCount: userConnections.length,
+      limit: getLimit(userPlan, "maxBankConnections"),
+      willBlock: isLimitReached(userPlan, "maxBankConnections", userConnections.length)
+    });
 
     if (isLimitReached(userPlan, "maxBankConnections", userConnections.length)) {
       const limit = getLimit(userPlan, "maxBankConnections");
