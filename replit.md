@@ -8,16 +8,16 @@ PocketTrack enforces feature restrictions based on subscription tier (Free/Essen
 
 ### Server-Side Enforcement
 - **Webhooks**: All webhook routes (GET, POST, PUT, DELETE) require authentication and Pro plan via `requireFeature("webhooks")` middleware
-- **Bank Connections**: POST routes check bank connection limits via `checkBankConnectionLimit` middleware (Free: 1, Essentials: 3, Pro: unlimited)
+- **Bank Connections**: Link token creation (GET /api/create_link_token) and token exchange (POST /api/exchange_public_token) check bank connection limits via `checkBankConnectionLimit` middleware (Free: 1, Essentials: 3, Pro: unlimited)
 - **Subscriptions**: POST routes check subscription limits via `checkSubscriptionLimit` middleware (Free: 10, Essentials: 25, Pro: unlimited)
 - **Returns HTTP 403** with clear upgrade message when limits exceeded
 
 ### Client-Side Enforcement
 - **Export Features**: CSV/JSON export blocked for Free users, shows upgrade prompt with action button
-- **Bank Connect**: Button disabled when limit reached, shows usage counter and upgrade prompt
+- **Bank Connect**: When limit is reached and user clicks "Connect Bank", shows confirm dialog with upgrade message before Plaid opens
 - **Add Subscription**: Blocked when limit reached, shows upgrade toast
 - **Visual Indicators**: Lock icons, Crown badges, and disabled states show locked features
-- **Upgrade Prompts**: All restricted actions show actionable upgrade buttons linking to /pricing
+- **Upgrade Prompts**: All restricted actions show actionable upgrade buttons/links to /pricing
 
 ## User Preferences
 - Clean, modern SaaS dashboard aesthetic
