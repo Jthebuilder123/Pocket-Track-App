@@ -1,0 +1,187 @@
+Context: This repo is an Express.js + TypeScript backend and a React frontend. I can’t connect bank accounts and I’ve likely created duplicate files during past attempts. Please perform the following changes as a single PR with clear // FIX: comments and a final summary of what changed.
+
+0) Repo clean-up (safe)
+
+Create a script tools/dedupe.ts that:
+
+Detects duplicate files like * (copy).*, * (1).*, *_copy.*, or duplicates outside src/server and src/client.
+
+Moves dupes into __trash__/ (do NOT delete) and prints a list of what moved.
+
+Keep canonical code only under:
+
+src/server/** (Express + TS)
+
+src/client/** (React)
+
+Ensure a single entrypoint: src/server/index.ts and a single client app entry (Vite/CRA): src/client/main.tsx (or index.tsx). Update imports accordingly.
+
+Add npm scripts:
+
+"scripts": {
+  "dev": "tsx watch src/server/index.ts",
+  "build": "tsc -p tsconfig.json",
+  "start": "node dist/server/index.js",
+  "dedupe": "tsx tools/dedupe.ts",
+  "typecheck": "tsc --noEmit",
+  "lint": "eslint ."
+}
+
+1) Environment + middlewares
+
+Create .env.example with:
+
+APP_BASE_URL=http://localhost:3000
+PLAID_CLIENT_ID=
+PLAID_SECRET=
+PLAID_ENV=sandbox
+SESSION_SECRET=dev-secret
+
+
+In src/server/index.ts add standard middlewares in this order:
+
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import session from 'express-session';
+import path from 'path';
+const app = express();
+app.use(cors({ origin: true, credentials: true }));
+app.use(morgan('dev'));
+app.use(express.json({ limit: '1mb' })); // keep before routers that need JSON
+app.use(session({ secret: process.env.SESSION_SECRET || 'dev', resave:false, saveUninitialized:false }));
+app.get('/healthz', (_req,res)=>res.json({ok:true}));
+
+
+Important: If there is a Stripe webhook using express.raw, mount that one before express.json() for that path only; otherwise Plaid routes can keep using JSON.
+
+2) Plaid backend (TypeScript)
+
+Create src/server/plaid.ts containing:
+
+// FIX: PLAID – canonical implementation
+import express from 'express';
+import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
+export const plaidRouter = express.Router();
+const env = (process.env.PLAID_ENV || 'sandbox') as keyof typeof PlaidEnvironments;
+const cfg = new Configuration({
+  basePath: PlaidEnvironments[env],
+  baseOptions: { headers: {
+    'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID!,
+    'PLAID-SECRET': process.env.PLAID_SECRET!
+  }}
+});
+const plaid = new PlaidApi(cfg);
+
+plaidRouter.get('/create_link_token', async (req, res) => {
+  try {
+    const userId = (req as any).session?.userId || 'demo-user-123';
+    const r = await plaid.linkTokenCreate({
+      user: { client_user_id: String(userId) },
+      client_name: 'PocketTrack',
+      language: 'en',
+      country_codes: ['US'],
+      products: ['transactions'],
+      webhook: `${process.env.APP_BASE_URL}/api/plaid/webhook`,
+      redirect_uri: `${process.env.APP_BASE_URL}/plaid/return`
+    });
+    res.json({ link_token: r.data.link_token });
+  } catch (e:any) {
+    console.error('PLAID create_link_token error', e?.response?.data || e);
+    res.status(500).json({ error: 'link_token_failed' });
+  }
+});
+
+plaidRouter.post('/exchange_public_token', async (req, res) => {
+  try {
+    const { public_token } = req.body || {};
+    if (!public_token) return res.status(400).json({ error: 'missing_public_token' });
+    const r = await plaid.itemPublicTokenExchange({ public_token });
+    // TODO: persist r.data.access_token to your DB encrypted and associate to current user
+    console.log('PLAID access_token obtained for user', (req as any).session?.userId || 'demo');
+    res.json({ status: 'ok' });
+  } catch (e:any) {
+    console.error('PLAID exchange error', e?.response?.data || e);
+    res.status(500).json({ error: 'exchange_failed' });
+  }
+});
+
+plaidRouter.post('/webhook', (req, res) => {
+  console.log('PLAID WEBHOOK:', req.body?.webhook_type, req.body?.webhook_code);
+  res.sendStatus(200);
+});
+
+
+In src/server/index.ts mount it:
+
+import { plaidRouter } from './plaid';
+app.use('/api/plaid', plaidRouter);
+
+
+Add robust logging around server start:
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`[server] listening on ${port} | env=${process.env.PLAID_ENV}`));
+
+3) React client – single, reliable Connect button
+
+Install @plaid/react-plaid-link on the client.
+
+Create src/client/components/ConnectBankButton.tsx:
+
+// FIX: PLAID – React button
+import React from 'react';
+import { usePlaidLink } from '@plaid/react-plaid-link';
+
+export default function ConnectBankButton() {
+  const [token, setToken] = React.useState<string>();
+  React.useEffect(() => {
+    fetch('/api/plaid/create_link_token', { credentials:'include' })
+      .then(r => r.json()).then(d => setToken(d.link_token))
+      .catch(() => setToken(undefined));
+  }, []);
+  const onSuccess = async (public_token: string) => {
+    await fetch('/api/plaid/exchange_public_token', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      credentials:'include',
+      body: JSON.stringify({ public_token })
+    });
+    window.location.href = '/';
+  };
+  const { open, ready } = usePlaidLink({ token, onSuccess });
+  return <button data-action="connect-bank" disabled={!ready} onClick={()=>open()} className="btn btn-primary">Connect bank</button>;
+}
+
+
+Render it on the dashboard and add a smoke page:
+
+Route /debug/smoke that shows Connect bank button and prints success/failure in the UI.
+
+Add CSS guard to prevent overlays blocking clicks:
+
+.overlay[aria-hidden="true"], .drawer[aria-hidden="true"] { pointer-events:none !important; opacity:0 !important; }
+
+4) Remove broken duplicates from imports/routers
+
+Search for any other create_link_token / exchange_public_token routes and remove or comment them, leaving only the ones in src/server/plaid.ts.
+
+Ensure the frontend imports only ConnectBankButton and not any older button components.
+
+5) End-to-end checks
+
+Add an npm script "smoke": "node -e \\"fetch('http://localhost:3000/healthz').then(r=>r.json()).then(console.log)\\"".
+
+Run "typecheck" and fix TS errors introduced by dedupe.
+
+Output a final summary including:
+
+files moved to __trash__/,
+
+routes now active under /api/plaid/*,
+
+pages/components modified,
+
+and any environment variables still missing.
+
+Do not delete anything permanently; move dupes to __trash__/ and commit.
