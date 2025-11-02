@@ -38,93 +38,117 @@ export default function App() {
   const handleWebViewMessage = async (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      console.log('[PLAID-MOBILE] WebView message:', data.type);
+      console.log('[PLAID-MOBILE] WebView message received:', data.type);
 
       if (data.type === 'OPEN_PLAID_NATIVE') {
-        console.log('[PLAID-MOBILE] Opening native Plaid Link');
+        console.log('[PLAID-MOBILE] Received link token from WebView');
         
-        // Fetch link token from backend
-        const response = await fetch(`${POCKETTRACK_URL}api/plaid/create_link_token`, {
-          credentials: 'include',
-        });
+        // FIX: Use link token from WebView (which has cookies) instead of fetching ourselves
+        const linkToken = data.linkToken;
         
-        if (!response.ok) {
-          console.error('[PLAID-MOBILE] Failed to fetch link token:', response.status);
+        if (!linkToken) {
+          console.error('[PLAID-MOBILE] No link token provided in message');
           webViewRef.current?.postMessage(JSON.stringify({
             type: 'PLAID_ERROR',
-            error: 'Failed to create link token'
+            error: 'No link token received'
           }));
           return;
         }
-
-        const { link_token } = await response.json();
-        console.log('[PLAID-MOBILE] Link token received, opening Plaid');
-        setLinkToken(link_token);
+        
+        console.log('[PLAID-MOBILE] Link token received:', {
+          tokenPrefix: linkToken.substring(0, 15) + '...'
+        });
+        
+        console.log('[PLAID-MOBILE] Opening native Plaid Link...');
+        setLinkToken(linkToken);
+      } else if (data.type === 'PLAID_ERROR') {
+        // WebView encountered an error fetching link token
+        console.error('[PLAID-MOBILE] WebView error:', data.error);
       }
     } catch (error) {
       console.error('[PLAID-MOBILE] Error handling WebView message:', error);
+      webViewRef.current?.postMessage(JSON.stringify({
+        type: 'PLAID_ERROR',
+        error: 'Failed to process request: ' + error.message
+      }));
     }
   };
 
   // FIX: PLAID - Handle successful Plaid connection
   const onPlaidSuccess = async (success) => {
-    console.log('[PLAID-MOBILE] Plaid success:', success.publicToken);
+    console.log('[PLAID-MOBILE] Plaid Link completed successfully');
+    console.log('[PLAID-MOBILE] Public token received:', {
+      tokenPrefix: success.publicToken?.substring(0, 15) + '...',
+      metadata: success.metadata
+    });
+    
+    // Clear link token to dismiss Plaid Link
     setLinkToken(null);
 
-    // Exchange public token with backend
-    try {
-      const response = await fetch(`${POCKETTRACK_URL}api/plaid/exchange_public_token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ public_token: success.publicToken }),
-      });
-
-      if (response.ok) {
-        console.log('[PLAID-MOBILE] Token exchanged successfully');
-        // Notify WebView of success
-        webViewRef.current?.postMessage(JSON.stringify({
-          type: 'PLAID_SUCCESS',
-        }));
-      } else {
-        console.error('[PLAID-MOBILE] Failed to exchange token:', response.status);
-        webViewRef.current?.postMessage(JSON.stringify({
-          type: 'PLAID_ERROR',
-          error: 'Failed to exchange token'
-        }));
-      }
-    } catch (error) {
-      console.error('[PLAID-MOBILE] Error exchanging token:', error);
-      webViewRef.current?.postMessage(JSON.stringify({
-        type: 'PLAID_ERROR',
-        error: error.message
-      }));
-    }
+    // FIX: Send public token to WebView to exchange (WebView has cookies for auth)
+    console.log('[PLAID-MOBILE] Sending public token to WebView for exchange');
+    webViewRef.current?.postMessage(JSON.stringify({
+      type: 'PLAID_PUBLIC_TOKEN',
+      publicToken: success.publicToken,
+      metadata: success.metadata
+    }));
+    
+    // WebView will handle the exchange and notify us of success/failure
   };
 
   // FIX: PLAID - Handle Plaid exit/cancel
   const onPlaidExit = (exit) => {
-    console.log('[PLAID-MOBILE] Plaid exited:', exit.error || 'User cancelled');
+    console.log('[PLAID-MOBILE] Plaid Link exited:', {
+      hasError: !!exit.error,
+      errorCode: exit.error?.error_code,
+      errorMessage: exit.error?.error_message,
+      errorType: exit.error?.error_type
+    });
+    
+    // Clear link token to close Plaid Link
     setLinkToken(null);
     
     if (exit.error) {
+      // Plaid returned an error
+      const errorMessage = exit.error.error_message || exit.error.display_message || 'An error occurred';
+      const errorCode = exit.error.error_code;
+      
+      console.error('[PLAID-MOBILE] Plaid error:', {
+        code: errorCode,
+        type: exit.error.error_type,
+        message: errorMessage
+      });
+      
+      // Send error to WebView (WebView can handle retry if needed)
       webViewRef.current?.postMessage(JSON.stringify({
         type: 'PLAID_ERROR',
-        error: exit.error.message
+        error: errorMessage,
+        errorCode: errorCode
       }));
     } else {
       // User cancelled
+      console.log('[PLAID-MOBILE] User cancelled Plaid Link');
       webViewRef.current?.postMessage(JSON.stringify({
         type: 'PLAID_CANCELLED',
       }));
     }
   };
 
-  // FIX: PLAID - Handle Plaid events
+  // FIX: PLAID - Handle Plaid events (for debugging and analytics)
   const onPlaidEvent = (event) => {
-    console.log('[PLAID-MOBILE] Plaid event:', event.eventName);
+    console.log('[PLAID-MOBILE] Plaid event:', {
+      eventName: event.eventName,
+      metadata: event.metadata
+    });
+    
+    // Log important events for debugging
+    if (event.eventName === 'ERROR') {
+      console.error('[PLAID-MOBILE] Plaid event error:', event.metadata);
+    } else if (event.eventName === 'HANDOFF') {
+      console.log('[PLAID-MOBILE] User handed off to institution website');
+    } else if (event.eventName === 'SELECT_INSTITUTION') {
+      console.log('[PLAID-MOBILE] User selected institution:', event.metadata?.institution_name);
+    }
   };
 
   // Handle navigation requests
@@ -202,8 +226,85 @@ export default function App() {
   // FIX: Inject JavaScript to detect WebView environment and intercept Plaid
   const injectedJavaScript = `
     (function() {
-      // Mark as React Native WebView for detection
-      window.ReactNativeWebView = true;
+      // Mark as React Native WebView for detection (DON'T overwrite the bridge object!)
+      window.isReactNativeWebView = true;
+      
+      // FIX: Listen for messages from React Native (for public token exchange)
+      document.addEventListener('message', function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('[PLAID-WEBVIEW] Message from React Native:', data.type);
+          
+          if (data.type === 'PLAID_PUBLIC_TOKEN') {
+            console.log('[PLAID-WEBVIEW] Exchanging public token...');
+            
+            // Exchange public token with backend (we have cookies for auth)
+            fetch('/api/exchange_public_token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include',
+              body: JSON.stringify({ public_token: data.publicToken })
+            })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Exchange failed: ' + response.status);
+              }
+              return response.json();
+            })
+            .then(result => {
+              console.log('[PLAID-WEBVIEW] Token exchanged successfully');
+              
+              // Reload page to show new bank connection
+              window.location.reload();
+            })
+            .catch(error => {
+              console.error('[PLAID-WEBVIEW] Error exchanging token:', error);
+              alert('Failed to connect bank: ' + error.message);
+            });
+          }
+        } catch (error) {
+          console.error('[PLAID-WEBVIEW] Error handling message:', error);
+        }
+      });
+      
+      // Also listen for window messages (for compatibility)
+      window.addEventListener('message', function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('[PLAID-WEBVIEW] Window message from React Native:', data.type);
+          
+          if (data.type === 'PLAID_PUBLIC_TOKEN') {
+            console.log('[PLAID-WEBVIEW] Exchanging public token...');
+            
+            fetch('/api/exchange_public_token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              credentials: 'include',
+              body: JSON.stringify({ public_token: data.publicToken })
+            })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Exchange failed: ' + response.status);
+              }
+              return response.json();
+            })
+            .then(result => {
+              console.log('[PLAID-WEBVIEW] Token exchanged successfully');
+              window.location.reload();
+            })
+            .catch(error => {
+              console.error('[PLAID-WEBVIEW] Error exchanging token:', error);
+              alert('Failed to connect bank: ' + error.message);
+            });
+          }
+        } catch (error) {
+          console.error('[PLAID-WEBVIEW] Error handling window message:', error);
+        }
+      });
       
       // FIX: OVERLAY - Add CSS to prevent overlays from blocking clicks
       const injectOverlayFixes = () => {
@@ -236,12 +337,36 @@ export default function App() {
         if (window.Plaid && window.Plaid.create) {
           const originalPlaidCreate = window.Plaid.create;
           window.Plaid.create = function(config) {
-            console.log('[PLAID-WEBVIEW] Intercepting Plaid.create, using native SDK');
+            console.log('[PLAID-WEBVIEW] Intercepting Plaid.create, fetching link token from WebView');
             
-            // Send message to React Native to open native Plaid
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'OPEN_PLAID_NATIVE'
-            }));
+            // FIX: Fetch link token from WebView (which has cookies) instead of React Native
+            fetch('/api/create_link_token', {
+              credentials: 'include'
+            })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Failed to create link token: ' + response.status);
+              }
+              return response.json();
+            })
+            .then(data => {
+              console.log('[PLAID-WEBVIEW] Link token received, sending to React Native');
+              
+              // Send link token to React Native to open native Plaid
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'OPEN_PLAID_NATIVE',
+                linkToken: data.link_token
+              }));
+            })
+            .catch(error => {
+              console.error('[PLAID-WEBVIEW] Error fetching link token:', error);
+              
+              // Send error to React Native
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'PLAID_ERROR',
+                error: 'Failed to create link token: ' + error.message
+              }));
+            });
             
             // Return a dummy handler
             return {
