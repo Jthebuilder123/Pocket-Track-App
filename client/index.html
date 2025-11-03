@@ -266,8 +266,16 @@
       function detectWebView() {
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
         
+        // CRITICAL FIX: Check for React Native WebView flag first (set by injected JavaScript)
+        // This flag is set by our mobile app via injectedJavaScript in App.js
+        if (window.isReactNativeWebView === true) {
+          console.log('[WEBVIEW-DETECT] Detected via window.isReactNativeWebView flag');
+          return { isMobileWebView: true, isDesktopWebView: false };
+        }
+        
         // Check for React Native WebView (modern versions)
         if (window.ReactNativeWebView !== undefined) {
+          console.log('[WEBVIEW-DETECT] Detected via window.ReactNativeWebView object');
           return { isMobileWebView: true, isDesktopWebView: false };
         }
         
@@ -333,7 +341,7 @@
       
       // Log device detection result once with detailed info
       if (DEVICE_CONTEXT.isMobileWebView) {
-        console.log('[PLAID-LINK] Device detection: Mobile WebView (React Native/Cordova/iOS-Android) - will use OAuth redirect');
+        console.log('[PLAID-LINK] Device detection: Mobile WebView (React Native/Cordova/iOS-Android) - will use native Plaid SDK via message bridge');
       } else if (DEVICE_CONTEXT.isDesktopWebView) {
         console.log('[PLAID-LINK] Device detection: Desktop WebView (Electron) - will use modal mode');
       } else if (DEVICE_CONTEXT.isMobileBrowser) {
