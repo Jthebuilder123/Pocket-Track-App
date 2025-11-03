@@ -209,149 +209,9 @@
       });
     </script>
     
-    <!-- React Native Message Bridge for Native Plaid SDK -->
-    <script>
-      // Listen for messages from React Native (public_token or cancellation)
-      window.addEventListener('message', function(event) {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('[RN-BRIDGE] Received message from React Native:', data.type);
-          
-          if (data.type === 'PLAID_SUCCESS') {
-            console.log('[RN-BRIDGE] Plaid success - exchanging public token...');
-            
-            // Exchange public token with backend
-            fetch('/api/exchange_public_token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({ public_token: data.publicToken })
-            })
-            .then(response => {
-              if (!response.ok) {
-                throw new Error('Failed to exchange token: ' + response.statusText);
-              }
-              return response.json();
-            })
-            .then(result => {
-              console.log('[RN-BRIDGE] Token exchanged successfully', result);
-              // Reload page to show new bank connection
-              window.location.reload();
-            })
-            .catch(error => {
-              console.error('[RN-BRIDGE] Error exchanging token:', error);
-              alert('Failed to connect bank. Please try again.');
-            });
-          } else if (data.type === 'PLAID_EXIT') {
-            console.log('[RN-BRIDGE] Plaid exited/cancelled');
-            // Just log it - button will be re-enabled by the event handler
-          } else if (data.type === 'PLAID_ERROR') {
-            console.error('[RN-BRIDGE] Plaid error:', data.error);
-            alert('Bank connection failed: ' + (data.error || 'Unknown error'));
-          }
-        } catch (error) {
-          // Ignore non-JSON messages
-          console.debug('[RN-BRIDGE] Ignoring non-JSON message');
-        }
-      });
-      
-      console.log('[RN-BRIDGE] React Native message listener initialized');
-    </script>
-    
     <!-- Plaid Link Event Handler -->
     <script>
-      console.log('[PLAID-LINK] Attaching event handler for Connect Bank buttons...');
-      
-      // WebView detection - returns { isMobileWebView, isDesktopWebView }
-      function detectWebView() {
-        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-        
-        // CRITICAL FIX: Check for React Native WebView flag first (set by injected JavaScript)
-        // This flag is set by our mobile app via injectedJavaScript in App.js
-        if (window.isReactNativeWebView === true) {
-          console.log('[WEBVIEW-DETECT] Detected via window.isReactNativeWebView flag');
-          return { isMobileWebView: true, isDesktopWebView: false };
-        }
-        
-        // Check for React Native WebView (modern versions)
-        if (window.ReactNativeWebView !== undefined) {
-          console.log('[WEBVIEW-DETECT] Detected via window.ReactNativeWebView object');
-          return { isMobileWebView: true, isDesktopWebView: false };
-        }
-        
-        // Check for Cordova/PhoneGap
-        if (window.cordova !== undefined || window.phonegap !== undefined) {
-          return { isMobileWebView: true, isDesktopWebView: false };
-        }
-        
-        // Check for Capacitor
-        if (window.Capacitor !== undefined) {
-          return { isMobileWebView: true, isDesktopWebView: false };
-        }
-        
-        // Check for Android WebView (has "wv" in user agent)
-        if (/wv|WebView/i.test(userAgent)) {
-          return { isMobileWebView: true, isDesktopWebView: false };
-        }
-        
-        // Check for iOS WebView heuristics
-        // iOS WebViews often lack "Safari/" in user agent while having "Mobile/"
-        const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
-        const hasSafari = /Safari/i.test(userAgent);
-        const hasMobile = /Mobile/i.test(userAgent);
-        
-        if (isIOS && hasMobile && !hasSafari) {
-          // Likely an iOS WebView (in-app browser)
-          return { isMobileWebView: true, isDesktopWebView: false };
-        }
-        
-        // Additional iOS WebView check: WKWebView doesn't set navigator.standalone
-        // but can be detected by missing Safari + present webkit
-        if (isIOS && !hasSafari && /AppleWebKit/i.test(userAgent)) {
-          return { isMobileWebView: true, isDesktopWebView: false };
-        }
-        
-        // Check for desktop WebViews (Electron, etc.)
-        // Electron apps typically have "Electron" in user agent
-        if (/Electron/i.test(userAgent)) {
-          return { isMobileWebView: false, isDesktopWebView: true };
-        }
-        
-        return { isMobileWebView: false, isDesktopWebView: false };
-      }
-      
-      // Cache detection results to avoid recalculating and ensure consistency
-      const DEVICE_CONTEXT = (function() {
-        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-        const isMobileBrowser = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
-        const webViewInfo = detectWebView();
-        
-        // CRITICAL FIX: Only actual mobile WebViews need OAuth redirect mode
-        // Mobile browsers (Safari, Chrome) work fine with modal mode
-        // Desktop WebViews (Electron) and desktop browsers use modal mode
-        const shouldUseOAuth = webViewInfo.isMobileWebView;
-        
-        return {
-          isMobileWebView: webViewInfo.isMobileWebView,
-          isDesktopWebView: webViewInfo.isDesktopWebView,
-          isMobileBrowser: isMobileBrowser,
-          shouldUseOAuthRedirect: shouldUseOAuth
-        };
-      })();
-      
-      // Log device detection result once with detailed info
-      if (DEVICE_CONTEXT.isMobileWebView) {
-        console.log('[PLAID-LINK] Device detection: Mobile WebView (React Native/Cordova/iOS-Android) - will use native Plaid SDK via message bridge');
-      } else if (DEVICE_CONTEXT.isDesktopWebView) {
-        console.log('[PLAID-LINK] Device detection: Desktop WebView (Electron) - will use modal mode');
-      } else if (DEVICE_CONTEXT.isMobileBrowser) {
-        console.log('[PLAID-LINK] Device detection: Mobile browser (Safari/Chrome on iOS/Android) - will use modal mode');
-      } else {
-        console.log('[PLAID-LINK] Device detection: Desktop browser - will use modal mode');
-      }
-      
-      // Expose for use in event handlers
-      const isMobile = DEVICE_CONTEXT.shouldUseOAuthRedirect;
+      console.log('[PLAID-LINK] Initializing Connect Bank handler with React Native bridge support...');
       
       // Auto-resume Plaid Link if returning from OAuth redirect
       if (window.plaidOAuthRedirect) {
@@ -441,7 +301,7 @@
       }
       
       // FIX: Vanilla JS event delegation for Connect Bank button
-      // Prevents overlay blocking and ensures reliable click handling
+      // NEW APPROACH: Try React Native bridge first, fall back to modal mode
       document.addEventListener('click', async (e) => {
         const el = e.target.closest('[data-action="connect-bank"]');
         if (!el) return;
@@ -471,40 +331,9 @@
         }
         
         try {
-          // Fetch link token from backend
+          // Fetch link token from backend (always needed)
           console.log('[PLAID-LINK] Fetching link token...');
-          
-          // For mobile WebViews, use Hosted Link (opens in native browser)
-          // For mobile browsers and desktop, use standard Link (modal or redirect)
-          const isMobileWebView = DEVICE_CONTEXT.isMobileWebView;
-          const baseUrl = window.location.origin;
-          
-          let linkTokenUrl;
-          
-          if (isMobileWebView) {
-            // Mobile WebView: Use Hosted Link with completion redirect
-            const completionRedirectUri = `${baseUrl}/plaid/callback`;
-            linkTokenUrl = `/api/create_link_token?is_mobile_webview=true&completion_redirect_uri=${encodeURIComponent(completionRedirectUri)}`;
-            console.log('[PLAID-LINK] Using Hosted Link for mobile WebView', { completionRedirectUri });
-          } else if (isMobile) {
-            // Mobile browser: Use standard OAuth redirect
-            const redirectUri = `${baseUrl}/`;
-            linkTokenUrl = `/api/create_link_token?redirect_uri=${encodeURIComponent(redirectUri)}`;
-            
-            // Store current page to return to after OAuth
-            const currentPath = window.location.pathname;
-            if (currentPath && currentPath !== '/') {
-              sessionStorage.setItem('plaid_return_path', currentPath);
-              console.log('[PLAID-LINK] Stored return path:', currentPath);
-            }
-            console.log('[PLAID-LINK] Using OAuth redirect for mobile browser', { redirectUri });
-          } else {
-            // Desktop: Use modal mode
-            linkTokenUrl = '/api/create_link_token';
-            console.log('[PLAID-LINK] Using modal mode for desktop');
-          }
-          
-          const linkTokenResponse = await fetch(linkTokenUrl, {
+          const linkTokenResponse = await fetch('/api/create_link_token', {
             credentials: 'include'
           });
           
@@ -546,40 +375,91 @@
           }
           
           const { link_token } = await linkTokenResponse.json();
-          console.log('[PLAID-LINK] Link token received', { isMobileWebView, isMobile });
+          console.log('[PLAID-LINK] Link token received');
           
-          // Mobile WebView: Send link token to React Native for native Plaid SDK
-          if (isMobileWebView) {
-            console.log('[PLAID-LINK] Sending link token to React Native for native Plaid SDK');
+          // NEW APPROACH: Check if React Native WebView exists RIGHT NOW (not on page load)
+          if (window.ReactNativeWebView) {
+            console.log('[PLAID-LINK] ✅ React Native WebView detected - trying native SDK first');
             
-            // Send message to React Native
-            if (window.ReactNativeWebView) {
+            // Try React Native first with a timeout
+            const reactNativeSuccess = await new Promise((resolve) => {
+              let timeoutId;
+              let messageHandler;
+              
+              // Set up one-time message listener for React Native response
+              messageHandler = (event) => {
+                try {
+                  const data = JSON.parse(event.data);
+                  console.log('[PLAID-LINK] Received message from React Native:', data.type);
+                  
+                  if (data.type === 'PLAID_SUCCESS') {
+                    console.log('[PLAID-LINK] ✅ React Native succeeded!');
+                    clearTimeout(timeoutId);
+                    window.removeEventListener('message', messageHandler);
+                    resolve({ success: true, publicToken: data.publicToken });
+                  } else if (data.type === 'PLAID_EXIT' || data.type === 'PLAID_ERROR') {
+                    console.log('[PLAID-LINK] React Native exited or errored');
+                    clearTimeout(timeoutId);
+                    window.removeEventListener('message', messageHandler);
+                    resolve({ success: false, cancelled: true });
+                  }
+                } catch (error) {
+                  // Ignore non-JSON messages
+                }
+              };
+              
+              window.addEventListener('message', messageHandler);
+              
+              // Set 5-second timeout - if React Native doesn't respond, fall back to modal
+              timeoutId = setTimeout(() => {
+                console.log('[PLAID-LINK] ⏱️ React Native timeout - falling back to modal mode');
+                window.removeEventListener('message', messageHandler);
+                resolve({ success: false, timeout: true });
+              }, 5000);
+              
+              // Send link token to React Native
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'PLAID_LINK_TOKEN',
                 linkToken: link_token
               }));
-              console.log('[PLAID-LINK] Link token sent to React Native');
-            } else {
-              console.error('[PLAID-LINK] ReactNativeWebView not found');
-              alert('Cannot connect bank: Native bridge not available');
+              console.log('[PLAID-LINK] Link token sent to React Native, waiting for response...');
+            });
+            
+            // If React Native succeeded, exchange token and we're done
+            if (reactNativeSuccess.success) {
+              console.log('[PLAID-LINK] Exchanging token from React Native...');
+              const exchangeResponse = await fetch('/api/exchange_public_token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ public_token: reactNativeSuccess.publicToken })
+              });
+              
+              if (!exchangeResponse.ok) {
+                throw new Error('Failed to exchange token');
+              }
+              
+              console.log('[PLAID-LINK] Token exchanged successfully - reloading page');
+              window.location.reload();
+              return;
+            }
+            
+            // If user cancelled in React Native, re-enable button and exit
+            if (reactNativeSuccess.cancelled) {
+              console.log('[PLAID-LINK] User cancelled in React Native');
               el.disabled = false;
               if (textSpan) textSpan.textContent = originalText;
               else el.textContent = originalText;
               return;
             }
             
-            // Button will be re-enabled when React Native sends back the public token
-            // or if user cancels. The message handler below will take care of it.
-            return; // Exit here - React Native will handle the flow
+            // If timeout, fall through to modal mode below
+            console.log('[PLAID-LINK] Falling back to standard modal mode');
+          } else {
+            console.log('[PLAID-LINK] No React Native WebView detected - using standard modal mode');
           }
           
-          // Store link token in sessionStorage for OAuth redirect resume (mobile browser only)
-          if (isMobile) {
-            sessionStorage.setItem('plaid_link_token', link_token);
-            console.log('[PLAID-LINK] Stored link token in sessionStorage for OAuth resume');
-          }
-          
-          // Create and open standard Plaid Link (modal or redirect mode)
+          // Standard Plaid Link modal mode (desktop, mobile browsers, or React Native fallback)
           const plaidConfig = {
             token: link_token,
             onSuccess: async (public_token, metadata) => {
@@ -605,12 +485,8 @@
                   window.showPlaidResult('PASS: Bank connected successfully', true);
                 }
                 
-                // Redirect back to the original page (or dashboard if no return path stored)
-                const returnPath = sessionStorage.getItem('plaid_return_path');
-                sessionStorage.removeItem('plaid_return_path'); // Clean up
-                const redirectUrl = returnPath || '/';
-                console.log('[PLAID-LINK] Redirecting to:', redirectUrl);
-                setTimeout(() => window.location.href = redirectUrl, 1000);
+                // Reload to show new bank connection
+                setTimeout(() => window.location.reload(), 1000);
               } catch (error) {
                 console.error('[PLAID-LINK] Error exchanging token:', error);
                 if (window.showPlaidResult) {
@@ -643,13 +519,8 @@
             }
           };
           
-          // IMPORTANT: Do NOT set receivedRedirectUri on initial launch
-          // Only set it when resuming from OAuth redirect (handled in OAuth redirect handler above)
-          // Setting it too early causes Plaid Link to error before redirect
-          
           const handler = window.Plaid.create(plaidConfig);
-          
-          console.log('[PLAID-LINK] Opening Plaid Link...', isMobile ? '(will use OAuth redirect)' : '(modal mode)');
+          console.log('[PLAID-LINK] Opening Plaid Link modal...');
           handler.open();
           
         } catch (error) {
