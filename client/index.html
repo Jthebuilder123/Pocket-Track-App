@@ -209,6 +209,55 @@
       });
     </script>
     
+    <!-- React Native Message Bridge for Native Plaid SDK -->
+    <script>
+      // Listen for messages from React Native (public_token or cancellation)
+      window.addEventListener('message', function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('[RN-BRIDGE] Received message from React Native:', data.type);
+          
+          if (data.type === 'PLAID_SUCCESS') {
+            console.log('[RN-BRIDGE] Plaid success - exchanging public token...');
+            
+            // Exchange public token with backend
+            fetch('/api/exchange_public_token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ public_token: data.publicToken })
+            })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error('Failed to exchange token: ' + response.statusText);
+              }
+              return response.json();
+            })
+            .then(result => {
+              console.log('[RN-BRIDGE] Token exchanged successfully', result);
+              // Reload page to show new bank connection
+              window.location.reload();
+            })
+            .catch(error => {
+              console.error('[RN-BRIDGE] Error exchanging token:', error);
+              alert('Failed to connect bank. Please try again.');
+            });
+          } else if (data.type === 'PLAID_EXIT') {
+            console.log('[RN-BRIDGE] Plaid exited/cancelled');
+            // Just log it - button will be re-enabled by the event handler
+          } else if (data.type === 'PLAID_ERROR') {
+            console.error('[RN-BRIDGE] Plaid error:', data.error);
+            alert('Bank connection failed: ' + (data.error || 'Unknown error'));
+          }
+        } catch (error) {
+          // Ignore non-JSON messages
+          console.debug('[RN-BRIDGE] Ignoring non-JSON message');
+        }
+      });
+      
+      console.log('[RN-BRIDGE] React Native message listener initialized');
+    </script>
+    
     <!-- Plaid Link Event Handler -->
     <script>
       console.log('[PLAID-LINK] Attaching event handler for Connect Bank buttons...');
@@ -491,32 +540,29 @@
           const { link_token } = await linkTokenResponse.json();
           console.log('[PLAID-LINK] Link token received', { isMobileWebView, isMobile });
           
-          // Mobile WebView: Use Hosted Link (opens in native browser)
+          // Mobile WebView: Send link token to React Native for native Plaid SDK
           if (isMobileWebView) {
-            const hostedLinkUrl = `https://cdn.plaid.com/link/v2/stable/link.html?token=${link_token}`;
-            console.log('[PLAID-LINK] Opening Hosted Link in native browser');
+            console.log('[PLAID-LINK] Sending link token to React Native for native Plaid SDK');
             
-            // Store current page for return
-            sessionStorage.setItem('plaid_return_path', window.location.pathname);
-            
-            // Open in native browser (ASWebAuthenticationSession on iOS, Custom Tabs on Android)
-            const linkWindow = window.open(hostedLinkUrl, '_blank');
-            
-            // If window.open fails, provide fallback
-            if (!linkWindow || linkWindow.closed || typeof linkWindow.closed == 'undefined') {
-              console.error('[PLAID-LINK] Popup blocked - trying direct navigation');
-              window.location.href = hostedLinkUrl;
-            }
-            
-            // Re-enable button
-            if (textSpan) {
-              textSpan.textContent = originalText;
+            // Send message to React Native
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'PLAID_LINK_TOKEN',
+                linkToken: link_token
+              }));
+              console.log('[PLAID-LINK] Link token sent to React Native');
             } else {
-              el.textContent = originalText;
+              console.error('[PLAID-LINK] ReactNativeWebView not found');
+              alert('Cannot connect bank: Native bridge not available');
+              el.disabled = false;
+              if (textSpan) textSpan.textContent = originalText;
+              else el.textContent = originalText;
+              return;
             }
-            el.disabled = false;
             
-            return; // Exit here - callback will handle the rest
+            // Button will be re-enabled when React Native sends back the public token
+            // or if user cancels. The message handler below will take care of it.
+            return; // Exit here - React Native will handle the flow
           }
           
           // Store link token in sessionStorage for OAuth redirect resume (mobile browser only)

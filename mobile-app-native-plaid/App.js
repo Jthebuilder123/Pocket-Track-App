@@ -40,7 +40,7 @@ export default function App() {
       const data = JSON.parse(event.nativeEvent.data);
       console.log('[PLAID-MOBILE] WebView message received:', data.type);
 
-      if (data.type === 'OPEN_PLAID_NATIVE') {
+      if (data.type === 'PLAID_LINK_TOKEN') {
         console.log('[PLAID-MOBILE] Received link token from WebView');
         
         // FIX: Use link token from WebView (which has cookies) instead of fetching ourselves
@@ -88,7 +88,7 @@ export default function App() {
     // FIX: Send public token to WebView to exchange (WebView has cookies for auth)
     console.log('[PLAID-MOBILE] Sending public token to WebView for exchange');
     webViewRef.current?.postMessage(JSON.stringify({
-      type: 'PLAID_PUBLIC_TOKEN',
+      type: 'PLAID_SUCCESS',
       publicToken: success.publicToken,
       metadata: success.metadata
     }));
@@ -129,7 +129,7 @@ export default function App() {
       // User cancelled
       console.log('[PLAID-MOBILE] User cancelled Plaid Link');
       webViewRef.current?.postMessage(JSON.stringify({
-        type: 'PLAID_CANCELLED',
+        type: 'PLAID_EXIT',
       }));
     }
   };
@@ -223,88 +223,11 @@ export default function App() {
     return true; // Load in WebView
   };
 
-  // FIX: Inject JavaScript to detect WebView environment and intercept Plaid
+  // FIX: Inject JavaScript to detect WebView environment
   const injectedJavaScript = `
     (function() {
       // Mark as React Native WebView for detection (DON'T overwrite the bridge object!)
       window.isReactNativeWebView = true;
-      
-      // FIX: Listen for messages from React Native (for public token exchange)
-      document.addEventListener('message', function(event) {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('[PLAID-WEBVIEW] Message from React Native:', data.type);
-          
-          if (data.type === 'PLAID_PUBLIC_TOKEN') {
-            console.log('[PLAID-WEBVIEW] Exchanging public token...');
-            
-            // Exchange public token with backend (we have cookies for auth)
-            fetch('/api/exchange_public_token', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              credentials: 'include',
-              body: JSON.stringify({ public_token: data.publicToken })
-            })
-            .then(response => {
-              if (!response.ok) {
-                throw new Error('Exchange failed: ' + response.status);
-              }
-              return response.json();
-            })
-            .then(result => {
-              console.log('[PLAID-WEBVIEW] Token exchanged successfully');
-              
-              // Reload page to show new bank connection
-              window.location.reload();
-            })
-            .catch(error => {
-              console.error('[PLAID-WEBVIEW] Error exchanging token:', error);
-              alert('Failed to connect bank: ' + error.message);
-            });
-          }
-        } catch (error) {
-          console.error('[PLAID-WEBVIEW] Error handling message:', error);
-        }
-      });
-      
-      // Also listen for window messages (for compatibility)
-      window.addEventListener('message', function(event) {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('[PLAID-WEBVIEW] Window message from React Native:', data.type);
-          
-          if (data.type === 'PLAID_PUBLIC_TOKEN') {
-            console.log('[PLAID-WEBVIEW] Exchanging public token...');
-            
-            fetch('/api/exchange_public_token', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              credentials: 'include',
-              body: JSON.stringify({ public_token: data.publicToken })
-            })
-            .then(response => {
-              if (!response.ok) {
-                throw new Error('Exchange failed: ' + response.status);
-              }
-              return response.json();
-            })
-            .then(result => {
-              console.log('[PLAID-WEBVIEW] Token exchanged successfully');
-              window.location.reload();
-            })
-            .catch(error => {
-              console.error('[PLAID-WEBVIEW] Error exchanging token:', error);
-              alert('Failed to connect bank: ' + error.message);
-            });
-          }
-        } catch (error) {
-          console.error('[PLAID-WEBVIEW] Error handling window message:', error);
-        }
-      });
       
       // FIX: OVERLAY - Add CSS to prevent overlays from blocking clicks
       const injectOverlayFixes = () => {
@@ -332,71 +255,12 @@ export default function App() {
         console.log('[MOBILE] Overlay click-blocking fixes injected');
       };
       
-      // FIX: PLAID - Override Plaid Link creation to use native SDK
-      const checkAndOverridePlaid = () => {
-        if (window.Plaid && window.Plaid.create) {
-          const originalPlaidCreate = window.Plaid.create;
-          window.Plaid.create = function(config) {
-            console.log('[PLAID-WEBVIEW] Intercepting Plaid.create, fetching link token from WebView');
-            
-            // FIX: Fetch link token from WebView (which has cookies) instead of React Native
-            fetch('/api/create_link_token', {
-              credentials: 'include'
-            })
-            .then(response => {
-              if (!response.ok) {
-                throw new Error('Failed to create link token: ' + response.status);
-              }
-              return response.json();
-            })
-            .then(data => {
-              console.log('[PLAID-WEBVIEW] Link token received, sending to React Native');
-              
-              // Send link token to React Native to open native Plaid
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'OPEN_PLAID_NATIVE',
-                linkToken: data.link_token
-              }));
-            })
-            .catch(error => {
-              console.error('[PLAID-WEBVIEW] Error fetching link token:', error);
-              
-              // Send error to React Native
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'PLAID_ERROR',
-                error: 'Failed to create link token: ' + error.message
-              }));
-            });
-            
-            // Return a dummy handler
-            return {
-              open: function() {
-                console.log('[PLAID-WEBVIEW] Native Plaid will open');
-              },
-              exit: function() {},
-              destroy: function() {}
-            };
-          };
-          console.log('[PLAID-WEBVIEW] Plaid.create overridden for native SDK');
-        } else {
-          setTimeout(checkAndOverridePlaid, 100);
-        }
-      };
-      
-      // Start checking after page loads
+      // Run overlay fixes on load
       if (document.readyState === 'complete') {
         injectOverlayFixes();
-        checkAndOverridePlaid();
       } else {
-        window.addEventListener('load', () => {
-          injectOverlayFixes();
-          checkAndOverridePlaid();
-        });
+        window.addEventListener('load', injectOverlayFixes);
       }
-      
-      // Also check on DOM changes
-      setTimeout(checkAndOverridePlaid, 1000);
-      setTimeout(checkAndOverridePlaid, 3000);
     })();
     true;
   `;
