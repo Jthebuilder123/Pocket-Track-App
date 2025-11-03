@@ -60,24 +60,33 @@ The system features a clear separation of concerns, centralized shared types and
 - **Plaid API**: Production-ready bank account integration for secure transaction access and automatic subscription detection.
   - **Multi-Device Support**: Plaid Link adapts to different environments:
     - **Desktop browsers**: Modal/iframe mode for seamless in-page experience
-    - **Mobile browsers** (Safari, Chrome on iOS/Android): OAuth redirect mode for native browser authentication
-    - **Mobile WebView apps** (React Native, Cordova, Capacitor, Expo on iOS/Android): **Hosted Link** with native browser authentication for proper WebView compatibility
+    - **Mobile browsers** (Safari, Chrome on iOS/Android): Modal mode with OAuth redirect fallback
+    - **Mobile WebView apps** (React Native/Expo TestFlight/App Store): **Native Plaid SDK** via WebView ⇄ React Native message bridge
     - **Desktop WebView apps** (Electron): Modal mode for desktop WebView compatibility
-  - **WebView Detection**: Automatically detects WebView environments (window.ReactNativeWebView, window.cordova, window.Capacitor, iOS/Android in-app browsers) and distinguishes between mobile and desktop WebViews
+  - **WebView Detection**: Automatically detects WebView environments (window.ReactNativeWebView, window.isReactNativeWebView flag) and distinguishes between mobile browsers and mobile WebViews
   - **Device Context Caching**: Detection results cached on page load for consistency across event handlers
-  - **Hosted Link for TestFlight/Mobile Apps**:
-    - Uses Plaid's recommended Hosted Link for WebView apps (opens in iOS ASWebAuthenticationSession or Android Custom Tabs)
-    - Server-side callback storage system to overcome storage isolation between native browser and WebView
-    - Backend stores callback results in-memory Map keyed by user ID
-    - WebView polls `/api/plaid/callback-result` endpoint when regaining focus after native browser closes
-    - Callback page at `/plaid/callback` handles OAuth completion and stores result server-side
-    - Multiple trigger points: immediate execution, window load, visibilitychange, and focus events
-    - Duplicate-processing guard to prevent race conditions
+  - **Native Plaid SDK Integration for Mobile Apps** (Updated: Nov 3, 2025):
+    - **Architecture**: WebView ⇄ React Native message bridge using `postMessage` API
+    - **Flow**:
+      1. User clicks "Connect Bank" in WebView
+      2. WebView fetches link token from backend (authenticated with session cookies)
+      3. WebView sends `PLAID_LINK_TOKEN` message to React Native via `window.ReactNativeWebView.postMessage()`
+      4. React Native opens native Plaid Link SDK (`react-native-plaid-link-sdk`)
+      5. User completes authentication in native iOS/Android Plaid UI
+      6. React Native receives `public_token` from Plaid SDK
+      7. React Native sends `PLAID_SUCCESS` message back to WebView
+      8. WebView exchanges token with backend and reloads to show new bank connection
+    - **Message Contract**:
+      - WebView → React Native: `{type: 'PLAID_LINK_TOKEN', linkToken: string}`
+      - React Native → WebView: `{type: 'PLAID_SUCCESS', publicToken: string, metadata: object}`
+      - React Native → WebView: `{type: 'PLAID_EXIT'}` (user cancelled)
+      - React Native → WebView: `{type: 'PLAID_ERROR', error: string}`
+    - **Benefits**: No popup blocking, proper native UI, better UX, no OAuth redirect complexity
+    - **Files**: `client/index.html` (WebView message handling), `mobile-app-native-plaid/App.js` (React Native bridge)
   - **Production Requirements**: 
-    - For production (`PLAID_ENV=production`), redirect URIs must be registered in Plaid Dashboard under Settings → API → Allowed redirect URIs
-    - For sandbox (`PLAID_ENV=sandbox`), any redirect URI can be used dynamically for testing
-    - Mobile OAuth flow requires `redirect_uri` parameter in link token creation with `hosted_link.is_mobile_app = true`
-    - Completion redirect URI: `https://your-app-url.replit.app/plaid/callback`
+    - No redirect URIs needed for native SDK integration
+    - Backend must be accessible from mobile app for link token creation and token exchange
+    - React Native app must have `react-native-plaid-link-sdk` installed and configured
 - **Stripe**: Payment processing for subscription plans with webhook-based plan activation.
   - **Webhook Setup Required**: For production deployment, configure Stripe webhooks to point to your deployed app's webhook endpoint: `https://your-app-url.replit.app/api/webhooks/stripe`
   - **Required Events**: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
