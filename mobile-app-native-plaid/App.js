@@ -13,6 +13,12 @@ export default function App() {
   const webViewRef = useRef(null);
   const [linkToken, setLinkToken] = useState(null);
   
+  // FIX: CACHE-BUSTING - Add timestamp to URL to force fresh load every time
+  const [webViewUrl] = useState(() => {
+    const timestamp = Date.now();
+    return `${POCKETTRACK_URL}?v=${timestamp}`;
+  });
+  
   // FIX: EXTERNAL LINKS - Handle deep linking returns from system browser
   useEffect(() => {
     const handleDeepLink = (event) => {
@@ -286,13 +292,16 @@ export default function App() {
       
       <WebView
         ref={webViewRef}
-        source={{ uri: POCKETTRACK_URL }}
+        source={{ uri: webViewUrl }}
         style={styles.webview}
         onNavigationStateChange={handleNavigationStateChange}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         onMessage={handleWebViewMessage}
         injectedJavaScript={injectedJavaScript}
         injectedJavaScriptBeforeContentLoaded={injectedJavaScript}
+        // FIX: CACHE-BUSTING - Disable code caching to force fresh loads (keeps cookies for auth)
+        cacheEnabled={false}
+        cacheMode="LOAD_NO_CACHE"
         // Enable JavaScript
         javaScriptEnabled={true}
         // Enable DOM storage (for localStorage, sessionStorage)
