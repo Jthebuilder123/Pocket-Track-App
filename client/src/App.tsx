@@ -7,6 +7,8 @@ import { DashboardPage } from "@/components/dashboard-page";
 import Login from "@/pages/login";
 import Pricing from "@/pages/pricing";
 import ClickTest from "@/pages/click-test";
+import Privacy from "@/pages/privacy";
+import Support from "@/pages/support";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
@@ -32,6 +34,8 @@ function Router() {
       <Route path="/" component={DashboardPage} />
       <Route path="/login" component={Login} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/support" component={Support} />
       <Route path="/click-test" component={ClickTest} />
       {/* FIX: Use wouter Redirect for catch-all to prevent hard page reloads that cause flickering */}
       <Route>
