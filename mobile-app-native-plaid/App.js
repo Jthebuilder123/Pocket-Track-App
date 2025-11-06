@@ -317,7 +317,7 @@ export default function App() {
         // Pull to refresh
         pullToRefreshEnabled={true}
         // Start in loading state
-        startInLoadingState={true}
+        startInLoadingState={false}
         // Allow file access
         allowFileAccess={true}
         // User agent (mark as ReactNativeWebView)
