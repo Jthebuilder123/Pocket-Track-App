@@ -7,7 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { PlaidLink } from 'react-native-plaid-link-sdk';
 
 // Updated with actual PocketTrack URL
-const POCKETTRACK_URL = 'https://pocket-track-MVP.replit.app/';
+const POCKETTRACK_URL = 'https://pocket-track-mvp.replit.app/?t=';
 
 export default function App() {
   const webViewRef = useRef(null);
