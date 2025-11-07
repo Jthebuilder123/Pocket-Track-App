@@ -182,11 +182,33 @@ export default function App() {
       return false;
     }
     
+    // FIX: PLAID - Keep ALL Plaid URLs in WebView (critical for Plaid Link to work)
+    if (url.includes('cdn.plaid.com') || 
+        url.includes('link.plaid.com') || 
+        url.includes('.plaid.com')) {
+      console.log('[MOBILE] Keeping Plaid URL in WebView:', url);
+      return false;
+    }
+    
     // FIX: STRIPE - Open Stripe checkout and billing in system browser
     if (url.includes('checkout.stripe.com') || 
+        url.includes('id.stripe.com') ||
         url.includes('billing.stripe.com') ||
         url.includes('/billing/checkout')) {
-      console.log('[MOBILE] Opening Stripe checkout in system browser:', url);
+      console.log('[MOBILE] Opening Stripe in system browser:', url);
+      return true;
+    }
+    
+    // FIX: BANK OAuth - Open bank authentication flows in system browser
+    if (url.includes('/oauth/') || 
+        url.includes('/auth/authorize') || 
+        url.includes('/signin') || 
+        url.includes('/login')) {
+      // But not our own login pages
+      if (url.startsWith(POCKETTRACK_URL)) {
+        return false;
+      }
+      console.log('[MOBILE] Opening bank OAuth in system browser:', url);
       return true;
     }
     
@@ -196,19 +218,18 @@ export default function App() {
       return true;
     }
     
-    // Open any external domain (not our app) in system browser
+    // Keep common CDNs and fonts in WebView
+    const allowedInWebView = [
+      'fonts.googleapis.com',
+      'fonts.gstatic.com',
+    ];
+    
+    if (allowedInWebView.some(domain => url.includes(domain))) {
+      return false;
+    }
+    
+    // Open other external domains in system browser
     if (url.startsWith('http') && !url.startsWith(POCKETTRACK_URL)) {
-      // But allow common CDNs and auth providers in WebView
-      const allowedInWebView = [
-        'cdn.plaid.com',  // Keep for fallback
-        'fonts.googleapis.com',
-        'fonts.gstatic.com',
-      ];
-      
-      if (allowedInWebView.some(domain => url.includes(domain))) {
-        return false;
-      }
-      
       console.log('[MOBILE] Opening external link in system browser:', url);
       return true;
     }
