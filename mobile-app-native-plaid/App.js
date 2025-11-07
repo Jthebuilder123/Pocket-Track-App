@@ -12,6 +12,8 @@ const POCKETTRACK_URL = 'https://pocket-track-mvp.replit.app/?t=';
 export default function App() {
   const webViewRef = useRef(null);
   const [linkToken, setLinkToken] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 2;
   
   // FIX: CACHE-BUSTING - Add timestamp to URL to force fresh load every time
   const [webViewUrl] = useState(() => {
@@ -90,6 +92,9 @@ export default function App() {
     
     // Clear link token to dismiss Plaid Link
     setLinkToken(null);
+    
+    // Reset retry count on success
+    setRetryCount(0);
 
     // FIX: Send public token to WebView to exchange (WebView has cookies for auth)
     console.log('[PLAID-MOBILE] Sending public token to WebView for exchange');
@@ -102,13 +107,27 @@ export default function App() {
     // WebView will handle the exchange and notify us of success/failure
   };
 
+  // FIX: PLAID RETRY - Request fresh link token and retry
+  const retryPlaidLink = () => {
+    console.log('[PLAID-MOBILE] Requesting fresh link token for retry...');
+    
+    // Ask WebView to fetch a new link token
+    webViewRef.current?.postMessage(JSON.stringify({
+      type: 'PLAID_RETRY_REQUEST',
+    }));
+    
+    // Increment retry count
+    setRetryCount(prev => prev + 1);
+  };
+
   // FIX: PLAID - Handle Plaid exit/cancel
   const onPlaidExit = (exit) => {
     console.log('[PLAID-MOBILE] Plaid Link exited:', {
       hasError: !!exit.error,
       errorCode: exit.error?.error_code,
       errorMessage: exit.error?.error_message,
-      errorType: exit.error?.error_type
+      errorType: exit.error?.error_type,
+      retryCount: retryCount
     });
     
     // Clear link token to close Plaid Link
@@ -125,18 +144,33 @@ export default function App() {
         message: errorMessage
       });
       
-      // Send error to WebView (WebView can handle retry if needed)
-      webViewRef.current?.postMessage(JSON.stringify({
-        type: 'PLAID_ERROR',
-        error: errorMessage,
-        errorCode: errorCode
-      }));
+      // FIX: PLAID RETRY - Retry with fresh link token on certain errors
+      const retryableErrors = ['ITEM_LOGIN_REQUIRED', 'INVALID_LINK_TOKEN', 'EXPIRED_LINK_TOKEN'];
+      const shouldRetry = retryableErrors.includes(errorCode) && retryCount < MAX_RETRIES;
+      
+      if (shouldRetry) {
+        console.log('[PLAID-MOBILE] Retrying with fresh link token...');
+        setTimeout(() => retryPlaidLink(), 1000); // Small delay before retry
+      } else {
+        // Send error to WebView
+        webViewRef.current?.postMessage(JSON.stringify({
+          type: 'PLAID_ERROR',
+          error: errorMessage,
+          errorCode: errorCode
+        }));
+        
+        // Reset retry count for next attempt
+        setRetryCount(0);
+      }
     } else {
       // User cancelled
       console.log('[PLAID-MOBILE] User cancelled Plaid Link');
       webViewRef.current?.postMessage(JSON.stringify({
         type: 'PLAID_EXIT',
       }));
+      
+      // Reset retry count
+      setRetryCount(0);
     }
   };
 

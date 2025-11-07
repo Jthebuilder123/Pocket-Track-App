@@ -213,6 +213,46 @@
     <script>
       console.log('[PLAID-LINK] Initializing Connect Bank handler with React Native bridge support...');
       
+      // FIX: PLAID RETRY - Listen for retry requests from React Native
+      window.addEventListener('message', async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'PLAID_RETRY_REQUEST') {
+            console.log('[PLAID-LINK] Received retry request from React Native, fetching fresh link token...');
+            
+            // Fetch fresh link token
+            const linkTokenResponse = await fetch('/api/create_link_token', {
+              credentials: 'include'
+            });
+            
+            if (!linkTokenResponse.ok) {
+              console.error('[PLAID-LINK] Failed to fetch link token for retry');
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'PLAID_ERROR',
+                  error: 'Failed to fetch new link token'
+                }));
+              }
+              return;
+            }
+            
+            const { link_token } = await linkTokenResponse.json();
+            console.log('[PLAID-LINK] Fresh link token received, sending to React Native');
+            
+            // Send new link token to React Native
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'PLAID_LINK_TOKEN',
+                linkToken: link_token
+              }));
+            }
+          }
+        } catch (error) {
+          console.error('[PLAID-LINK] Error handling message from React Native:', error);
+        }
+      });
+      
       // Auto-resume Plaid Link if returning from OAuth redirect
       if (window.plaidOAuthRedirect) {
         console.log('[PLAID-OAUTH] Resuming Plaid Link flow after OAuth redirect...');
