@@ -327,8 +327,12 @@ export default function App() {
         javaScriptEnabled={true}
         // Enable DOM storage (for localStorage, sessionStorage)
         domStorageEnabled={true}
-        // Allow third-party cookies (needed for auth)
+        // FIX: PLAID RELIABILITY - Enable cookie sharing for iOS
+        sharedCookiesEnabled={true}
+        // Allow third-party cookies (needed for auth and Plaid)
         thirdPartyCookiesEnabled={true}
+        // FIX: PLAID RELIABILITY - Prevent new windows from opening (keep everything in WebView)
+        setSupportMultipleWindows={false}
         // Handle media playback
         mediaPlaybackRequiresUserAction={false}
         // Allow inline media playback on iOS
