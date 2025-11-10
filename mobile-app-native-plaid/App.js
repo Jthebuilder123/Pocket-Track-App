@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, SafeAreaView, Platform } from 'react-native';
+import { StyleSheet, SafeAreaView, Platform, View, Text, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
@@ -14,6 +14,10 @@ export default function App() {
   const [linkToken, setLinkToken] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 2;
+  
+  // FIX: LOADING - Track WebView loading state
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadProgress, setLoadProgress] = useState(0);
   
   // FIX: CACHE-BUSTING - Add timestamp to URL to force fresh load every time
   const [webViewUrl] = useState(() => {
@@ -326,9 +330,43 @@ export default function App() {
     true;
   `;
 
+  // FIX: LOADING - Handle WebView loading events
+  const handleLoadStart = () => {
+    console.log('[MOBILE] WebView started loading');
+    setIsLoading(true);
+    setLoadProgress(0);
+  };
+
+  const handleLoadProgress = (event) => {
+    const progress = event.nativeEvent.progress;
+    console.log('[MOBILE] WebView loading progress:', Math.round(progress * 100) + '%');
+    setLoadProgress(progress);
+  };
+
+  const handleLoadEnd = () => {
+    console.log('[MOBILE] WebView finished loading');
+    setIsLoading(false);
+    setLoadProgress(1);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
+      
+      {/* FIX: LOADING - Show loading screen while WebView loads */}
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color="#8B5CF6" />
+            <Text style={styles.loadingText}>Loading PocketTrack...</Text>
+            {loadProgress > 0 && loadProgress < 1 && (
+              <Text style={styles.loadingProgress}>
+                {Math.round(loadProgress * 100)}%
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
       
       {/* FIX: PLAID - Native Plaid Link */}
       {linkToken && (
@@ -354,9 +392,13 @@ export default function App() {
         onMessage={handleWebViewMessage}
         injectedJavaScript={injectedJavaScript}
         injectedJavaScriptBeforeContentLoaded={injectedJavaScript}
-        // FIX: CACHE-BUSTING - Disable code caching to force fresh loads (keeps cookies for auth)
-        cacheEnabled={false}
-        cacheMode="LOAD_NO_CACHE"
+        // FIX: LOADING - Track loading state
+        onLoadStart={handleLoadStart}
+        onLoadProgress={handleLoadProgress}
+        onLoadEnd={handleLoadEnd}
+        // FIX: SMART CACHING - Enable caching for resources (JS, CSS, images) while cache-busting HTML
+        cacheEnabled={true}
+        cacheMode="LOAD_DEFAULT"
         // Enable JavaScript
         javaScriptEnabled={true}
         // Enable DOM storage (for localStorage, sessionStorage)
@@ -396,5 +438,32 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#0a0a0a',
+    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContent: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+  },
+  loadingProgress: {
+    color: '#8B5CF6',
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 8,
   },
 });
