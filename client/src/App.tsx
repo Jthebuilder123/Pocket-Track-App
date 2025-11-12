@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { DashboardPage } from "@/components/dashboard-page";
 import Login from "@/pages/login";
 import Pricing from "@/pages/pricing";
+import Settings from "@/pages/settings";
 import ClickTest from "@/pages/click-test";
 import Privacy from "@/pages/privacy";
 import Support from "@/pages/support";
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/" component={DashboardPage} />
       <Route path="/login" component={Login} />
       <Route path="/pricing" component={Pricing} />
+      <Route path="/settings" component={Settings} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/support" component={Support} />
       <Route path="/click-test" component={ClickTest} />

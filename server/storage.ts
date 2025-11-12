@@ -41,6 +41,8 @@ export interface IStorage {
   upsertUser(userData: { id: string; email?: string | null; firstName?: string | null; lastName?: string | null; profileImageUrl?: string | null }): Promise<User>;
   updateUserPlan(userId: string, plan: string): Promise<User | undefined>;
   updateUserStripeInfo(userId: string, stripeCustomerId: string, stripeSubscriptionId?: string): Promise<User | undefined>;
+  // APPSTORE: Delete user and all data (Guideline 5.1.1 v)
+  deleteUser(id: string): Promise<boolean>;
   
   // Email signup operations
   createEmailSignup(signup: InsertEmailSignup): Promise<EmailSignup>;
@@ -501,6 +503,21 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return user || undefined;
+  }
+
+  // APPSTORE: Delete user account and all data (Guideline 5.1.1 v)
+  async deleteUser(id: string): Promise<boolean> {
+    try {
+      const result = await db
+        .delete(users)
+        .where(eq(users.id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      logger.error("Error deleting user:", { error, userId: id });
+      return false;
+    }
   }
 
   // Email signup operations

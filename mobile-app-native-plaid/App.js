@@ -220,6 +220,15 @@ export default function App() {
       return false;
     }
     
+    // APPSTORE: Keep Replit Auth in WebView for iOS compliance (Guideline 4.0)
+    // Auth flows must stay inside the app, not open external Safari
+    if (url.includes('auth.replit.com') || 
+        url.includes('replit.com/auth') ||
+        url.includes('id.replit.com')) {
+      console.log('[MOBILE] Keeping Replit Auth in WebView:', url);
+      return false;
+    }
+    
     // FIX: PLAID - Keep ALL Plaid URLs in WebView (critical for Plaid Link to work)
     if (url.includes('cdn.plaid.com') || 
         url.includes('link.plaid.com') || 

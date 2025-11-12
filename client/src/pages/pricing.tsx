@@ -4,13 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Check, X as XIcon, Loader2, ArrowRight, Sparkles, HelpCircle, RefreshCw } from "lucide-react";
+import { Check, X as XIcon, Loader2, ArrowRight, Sparkles, HelpCircle, RefreshCw, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+// APPSTORE: Import platform detection for iOS compliance (Guideline 3.1.1)
+import { isIOSApp } from "@/lib/platform";
 
 interface PlanFeatures {
   maxSubscriptions: number | null;
@@ -53,6 +55,9 @@ export default function Pricing() {
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  
+  // APPSTORE: Detect iOS to hide external payment links (Guideline 3.1.1)
+  const isIOS = isIOSApp();
 
   const { data: plans, isLoading: plansLoading } = useQuery<Plan[]>({
     queryKey: ["/api/pricing"],
@@ -325,6 +330,25 @@ export default function Pricing() {
                     data-testid={`button-plan-${plan.id}`}
                   >
                     {isCurrentPlan ? "Current Plan" : "Free Forever"}
+                  </Button>
+                ) : isIOS ? (
+                  // APPSTORE: Hide external Stripe payment links on iOS (Guideline 3.1.1)
+                  // Show "Contact Support" button instead
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    disabled={isCurrentPlan}
+                    onClick={() => navigate("/support")}
+                    data-testid={`button-plan-${plan.id}`}
+                  >
+                    {isCurrentPlan ? (
+                      "Current Plan"
+                    ) : (
+                      <>
+                        <Mail className="mr-2 h-4 w-4" />
+                        Contact Support to Upgrade
+                      </>
+                    )}
                   </Button>
                 ) : (
                   <Button

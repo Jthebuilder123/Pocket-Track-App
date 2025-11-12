@@ -6,8 +6,11 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import Stripe from "stripe";
 import { storage } from "./storage";
-import { insertSubscriptionSchema, cancelSubscriptionSchema, insertEmailSignupSchema } from "@shared/schema";
+import { insertSubscriptionSchema, cancelSubscriptionSchema, insertEmailSignupSchema, notificationPreferences, webhooks, subscriptionHistory } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+// APPSTORE: Import DB utilities for account deletion (Guideline 5.1.1 v)
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { createLinkToken, exchangePublicToken, getTransactions, getAccounts, getInstitution, plaidClient } from "./plaid";
 import { z } from "zod";
 import logger from "./logger";
@@ -503,6 +506,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       logger.error("Error fetching user:", { error });
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // APPSTORE: DELETE /api/account - Delete user account and all data (Guideline 5.1.1 v)
+  app.delete('/api/account', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user!.claims.sub;
+      logger.info("Account deletion requested", { userId });
+
+      // Get user info before deletion
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // 1. Delete all subscriptions and their history
+      const subscriptions = await storage.getSubscriptionsByUserId(userId);
+      
+      // 1a. Delete subscription history first (referencing subscription IDs)
+      let historyCount = 0;
+      for (const sub of subscriptions) {
+        const deleted = await db.delete(subscriptionHistory).where(eq(subscriptionHistory.subscriptionId, sub.id));
+        historyCount += deleted.rowCount || 0;
+      }
+      logger.info("Deleted subscription history", { userId, count: historyCount });
+
+      // 1b. Delete subscriptions
+      for (const sub of subscriptions) {
+        await storage.deleteSubscription(sub.id);
+      }
+      logger.info("Deleted subscriptions", { userId, count: subscriptions.length });
+
+      // 2. Delete all bank connections
+      const bankConnections = await storage.getBankConnectionsByUserId(userId);
+      for (const conn of bankConnections) {
+        await storage.deleteBankConnection(conn.id);
+      }
+      logger.info("Deleted bank connections", { userId, count: bankConnections.length });
+
+      // 3. Delete all detected subscriptions
+      const detectedSubs = await storage.getDetectedSubscriptionsByUserId(userId);
+      for (const detected of detectedSubs) {
+        await storage.deleteDetectedSubscription(detected.id, userId);
+      }
+      logger.info("Deleted detected subscriptions", { userId, count: detectedSubs.length });
+
+      // 4. Delete notification preferences
+      await db.delete(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+      logger.info("Deleted notification preferences", { userId });
+
+      // 5. Cancel Stripe subscription if exists
+      if (user.stripeSubscriptionId) {
+        try {
+          const stripe = (await import('stripe')).default;
+          const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY!);
+          await stripeClient.subscriptions.cancel(user.stripeSubscriptionId);
+          logger.info("Cancelled Stripe subscription", { userId, subscriptionId: user.stripeSubscriptionId });
+        } catch (error) {
+          logger.error("Failed to cancel Stripe subscription", { userId, error });
+          // Continue with deletion even if Stripe cancellation fails
+        }
+      }
+
+      // 6. Delete user record (MUST BE LAST - removes user ID)
+      const userDeleted = await storage.deleteUser(userId);
+      if (!userDeleted) {
+        throw new Error("Failed to delete user record");
+      }
+      logger.info("Deleted user record", { userId });
+
+      // 9. Logout and destroy session
+      req.logout(() => {
+        req.session?.destroy((err: any) => {
+          if (err) {
+            logger.error("Error destroying session", { error: err });
+          }
+        });
+      });
+
+      res.json({ 
+        message: "Account and all associated data have been permanently deleted",
+        deleted: {
+          subscriptions: subscriptions.length,
+          subscriptionHistory: historyCount,
+          bankConnections: bankConnections.length,
+          detectedSubscriptions: detectedSubs.length,
+          notificationPreferences: true,
+          user: true,
+        }
+      });
+    } catch (error) {
+      logger.error("Error deleting account:", { error });
+      res.status(500).json({ message: "Failed to delete account. Please contact support." });
     }
   });
 
