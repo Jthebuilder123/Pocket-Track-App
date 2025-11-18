@@ -135,14 +135,31 @@ PocketTrack implements comprehensive iOS App Store compliance across three criti
 - **Rationale**: Complies with Apple's requirement that digital subscriptions use Apple's In-App Purchase system
 - **Files**: `client/src/lib/platform.ts` (detection), `client/src/pages/pricing.tsx` (conditional rendering)
 
-### Guideline 4.0 - Sign in with Apple
-- **Implementation**: Replit Auth stays in WebView via domain whitelisting (replit.com, .replit.app)
-- **User Experience**: All authentication (Google, GitHub, Apple, Email/Password) flows complete within the app
+### Guideline 4.0 - Sign in with Apple & In-App Browsing
+- **Implementation**: 
+  - Replit Auth stays in WebView via domain whitelisting (replit.com, .replit.app)
+  - External links open in in-app browser (SafariViewController on iOS, Custom Tabs on Android) instead of Safari
+  - Uses expo-web-browser for seamless in-app browsing experience
+- **User Experience**: 
+  - All authentication (Google, GitHub, Apple, Email/Password) flows complete within the app
+  - External links (privacy policies, cancellation pages) open in-app with "Done" button to return
+  - Users never leave the PocketTrack app
 - **Smart Caching**: First launch ~10s, subsequent launches ~2-3s (5x improvement)
   - Resources (JS, CSS, images) cached
   - HTML cache-busted with ?v=timestamp for auth freshness
-- **Benefits**: No external browser redirects, maintains session state, better UX
-- **Files**: `mobile-app-native-plaid/App.js` (WebView config), `client/index.html` (caching strategy)
+- **In-App Browser Triggers**:
+  - Privacy policy links (Plaid, Stripe, Replit)
+  - Subscription cancellation assistance pages (Netflix, Spotify, etc.)
+  - Stripe checkout pages
+  - Bank OAuth flows
+  - Any external http/https links not in the allowlist
+- **Stays in WebView** (Critical for functionality):
+  - PocketTrack main app (*.replit.app)
+  - Replit Auth (auth.replit.com, id.replit.com)
+  - Plaid SDK (*.plaid.com)
+  - Fonts and CDNs (fonts.googleapis.com, fonts.gstatic.com)
+- **Benefits**: Apple compliance, no external browser redirects, maintains session state, better UX
+- **Files**: `mobile-app-native-plaid/App.js` (WebView config + in-app browser), `client/index.html` (caching strategy)
 
 ### Guideline 5.1.1v - Account Deletion
 - **Implementation**: Comprehensive DELETE /api/account endpoint with Settings page UI

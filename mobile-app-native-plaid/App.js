@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { StyleSheet, SafeAreaView, Platform, View, Text, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { StatusBar } from 'expo-status-bar';
 // FIX: PLAID - Import native Plaid SDK
 import { PlaidLink } from 'react-native-plaid-link-sdk';
@@ -199,13 +200,19 @@ export default function App() {
   const handleNavigationStateChange = (navState) => {
     const { url } = navState;
     
-    // Check if this is an external link that should open in system browser
+    // Check if this is an external link that should open in in-app browser
     if (shouldOpenExternally(url)) {
       // Prevent WebView from loading this URL
       webViewRef.current?.stopLoading();
       
-      // Open in system browser
-      Linking.openURL(url);
+      // APPSTORE: Open in in-app browser instead of Safari (Guideline 4.0 - better UX)
+      WebBrowser.openBrowserAsync(url, {
+        // iOS: Use SafariViewController for in-app browsing
+        // Android: Use Custom Tabs for in-app browsing
+        dismissButtonStyle: 'close',
+        controlsColor: '#8B5CF6', // PocketTrack brand color
+        toolbarColor: '#0a0a0a', // Dark toolbar
+      });
       
       return false;
     }
@@ -213,7 +220,7 @@ export default function App() {
     return true;
   };
 
-  // FIX: EXTERNAL LINKS - Determine if URL should open in external browser
+  // APPSTORE: Determine if URL should open in in-app browser (Guideline 4.0 - all content stays in app)
   const shouldOpenExternally = (url) => {
     // Don't intercept our own domain
     if (url.startsWith(POCKETTRACK_URL)) {
@@ -221,7 +228,7 @@ export default function App() {
     }
     
     // APPSTORE: Keep Replit Auth in WebView for iOS compliance (Guideline 4.0)
-    // Auth flows must stay inside the app, not open external Safari
+    // Auth flows must stay inside the app, not open external browser
     if (url.includes('auth.replit.com') || 
         url.includes('replit.com/auth') ||
         url.includes('id.replit.com')) {
@@ -237,16 +244,16 @@ export default function App() {
       return false;
     }
     
-    // FIX: STRIPE - Open Stripe checkout and billing in system browser
+    // APPSTORE: Open Stripe checkout in in-app browser (not Safari)
     if (url.includes('checkout.stripe.com') || 
         url.includes('id.stripe.com') ||
         url.includes('billing.stripe.com') ||
         url.includes('/billing/checkout')) {
-      console.log('[MOBILE] Opening Stripe in system browser:', url);
+      console.log('[MOBILE] Opening Stripe in in-app browser:', url);
       return true;
     }
     
-    // FIX: BANK OAuth - Open bank authentication flows in system browser
+    // APPSTORE: Open bank OAuth in in-app browser (not Safari)
     if (url.includes('/oauth/') || 
         url.includes('/auth/authorize') || 
         url.includes('/signin') || 
@@ -255,13 +262,20 @@ export default function App() {
       if (url.startsWith(POCKETTRACK_URL)) {
         return false;
       }
-      console.log('[MOBILE] Opening bank OAuth in system browser:', url);
+      console.log('[MOBILE] Opening bank OAuth in in-app browser:', url);
       return true;
     }
     
-    // FIX: CANCELLATION LINKS - Open provider cancellation pages in system browser
+    // APPSTORE: Open cancellation links in in-app browser (Guideline 4.0 - better UX)
     if (url.includes('/cancel') && !url.startsWith(POCKETTRACK_URL)) {
-      console.log('[MOBILE] Opening cancellation link in system browser:', url);
+      console.log('[MOBILE] Opening cancellation link in in-app browser:', url);
+      return true;
+    }
+    
+    // APPSTORE: Open privacy policy links in in-app browser (Plaid, Stripe, Replit)
+    const privacyDomains = ['plaid.com/legal', 'stripe.com/privacy', 'replit.com/site/privacy'];
+    if (privacyDomains.some(domain => url.includes(domain))) {
+      console.log('[MOBILE] Opening privacy policy in in-app browser:', url);
       return true;
     }
     
@@ -275,9 +289,9 @@ export default function App() {
       return false;
     }
     
-    // Open other external domains in system browser
+    // APPSTORE: Open other external domains in in-app browser (not Safari)
     if (url.startsWith('http') && !url.startsWith(POCKETTRACK_URL)) {
-      console.log('[MOBILE] Opening external link in system browser:', url);
+      console.log('[MOBILE] Opening external link in in-app browser:', url);
       return true;
     }
     
@@ -288,9 +302,16 @@ export default function App() {
   const handleShouldStartLoadWithRequest = (request) => {
     const { url } = request;
     
-    // Check if should open externally
+    // Check if should open in in-app browser
     if (shouldOpenExternally(url)) {
-      Linking.openURL(url);
+      // APPSTORE: Open in in-app browser instead of Safari (Guideline 4.0 - better UX)
+      WebBrowser.openBrowserAsync(url, {
+        // iOS: Use SafariViewController for in-app browsing
+        // Android: Use Custom Tabs for in-app browsing
+        dismissButtonStyle: 'close',
+        controlsColor: '#8B5CF6', // PocketTrack brand color
+        toolbarColor: '#0a0a0a', // Dark toolbar
+      });
       return false; // Don't load in WebView
     }
     
