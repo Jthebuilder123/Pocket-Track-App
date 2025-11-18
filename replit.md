@@ -183,10 +183,13 @@ PocketTrack implements comprehensive iOS App Store compliance across three criti
 - [x] Platform detection (iOS WebView identification)
 - [x] Stripe checkout hidden on iOS
 - [x] In-WebView authentication (no external browser)
+- [x] In-app browser for external links (privacy policies, cancellation pages)
 - [x] Smart caching for fast subsequent launches
 - [x] Account deletion in Settings
 - [x] Comprehensive data removal (subscriptions, history, bank data, preferences)
 - [x] Error-free deletion flow (tested end-to-end)
+- [ ] Test in-app browser: privacy policy links open in SafariViewController/Custom Tabs
+- [ ] Test in-app browser: cancellation assistance links stay in-app
 - [ ] Real screenshots from production build (currently AI-generated placeholders)
 - [ ] TestFlight beta testing
 - [ ] Final App Store submission with real device screenshots
