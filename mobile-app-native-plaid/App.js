@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, SafeAreaView, Platform, View, Text, ActivityIndicator } from 'react-native';
+import { StyleSheet, SafeAreaView, Platform, View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
@@ -379,6 +379,13 @@ export default function App() {
     setLoadProgress(1);
   };
 
+  // Handle Subscribe button press
+  const handleSubscribePress = () => {
+    console.log('[MOBILE] Opening subscribe page in system browser');
+    // Open in system browser (Safari/Chrome) not in-app browser
+    Linking.openURL('https://pockettrackapp.replit.app/subscribe');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
@@ -413,50 +420,64 @@ export default function App() {
         </PlaidLink>
       )}
       
-      <WebView
-        ref={webViewRef}
-        source={{ uri: webViewUrl }}
-        style={styles.webview}
-        onNavigationStateChange={handleNavigationStateChange}
-        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-        onMessage={handleWebViewMessage}
-        injectedJavaScript={injectedJavaScript}
-        injectedJavaScriptBeforeContentLoaded={injectedJavaScript}
-        // FIX: LOADING - Track loading state
-        onLoadStart={handleLoadStart}
-        onLoadProgress={handleLoadProgress}
-        onLoadEnd={handleLoadEnd}
-        // FIX: SMART CACHING - Enable caching for resources (JS, CSS, images) while cache-busting HTML
-        cacheEnabled={true}
-        cacheMode="LOAD_DEFAULT"
-        // Enable JavaScript
-        javaScriptEnabled={true}
-        // Enable DOM storage (for localStorage, sessionStorage)
-        domStorageEnabled={true}
-        // FIX: PLAID RELIABILITY - Enable cookie sharing for iOS
-        sharedCookiesEnabled={true}
-        // Allow third-party cookies (needed for auth and Plaid)
-        thirdPartyCookiesEnabled={true}
-        // FIX: PLAID RELIABILITY - Prevent new windows from opening (keep everything in WebView)
-        setSupportMultipleWindows={false}
-        // Handle media playback
-        mediaPlaybackRequiresUserAction={false}
-        // Allow inline media playback on iOS
-        allowsInlineMediaPlayback={true}
-        // Bounce effect on scroll (iOS)
-        bounces={true}
-        // Pull to refresh
-        pullToRefreshEnabled={true}
-        // Start in loading state
-        startInLoadingState={false}
-        // Allow file access
-        allowFileAccess={true}
-        // User agent (mark as ReactNativeWebView)
-        userAgent={Platform.select({
-          ios: 'PocketTrack-iOS/1.0 ReactNativeWebView',
-          android: 'PocketTrack-Android/1.0 ReactNativeWebView',
-        })}
-      />
+      {/* Main content area - WebView takes available space */}
+      <View style={styles.contentContainer}>
+        <WebView
+          ref={webViewRef}
+          source={{ uri: webViewUrl }}
+          style={styles.webview}
+          onNavigationStateChange={handleNavigationStateChange}
+          onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+          onMessage={handleWebViewMessage}
+          injectedJavaScript={injectedJavaScript}
+          injectedJavaScriptBeforeContentLoaded={injectedJavaScript}
+          // FIX: LOADING - Track loading state
+          onLoadStart={handleLoadStart}
+          onLoadProgress={handleLoadProgress}
+          onLoadEnd={handleLoadEnd}
+          // FIX: SMART CACHING - Enable caching for resources (JS, CSS, images) while cache-busting HTML
+          cacheEnabled={true}
+          cacheMode="LOAD_DEFAULT"
+          // Enable JavaScript
+          javaScriptEnabled={true}
+          // Enable DOM storage (for localStorage, sessionStorage)
+          domStorageEnabled={true}
+          // FIX: PLAID RELIABILITY - Enable cookie sharing for iOS
+          sharedCookiesEnabled={true}
+          // Allow third-party cookies (needed for auth and Plaid)
+          thirdPartyCookiesEnabled={true}
+          // FIX: PLAID RELIABILITY - Prevent new windows from opening (keep everything in WebView)
+          setSupportMultipleWindows={false}
+          // Handle media playback
+          mediaPlaybackRequiresUserAction={false}
+          // Allow inline media playback on iOS
+          allowsInlineMediaPlayback={true}
+          // Bounce effect on scroll (iOS)
+          bounces={true}
+          // Pull to refresh
+          pullToRefreshEnabled={true}
+          // Start in loading state
+          startInLoadingState={false}
+          // Allow file access
+          allowFileAccess={true}
+          // User agent (mark as ReactNativeWebView)
+          userAgent={Platform.select({
+            ios: 'PocketTrack-iOS/1.0 ReactNativeWebView',
+            android: 'PocketTrack-Android/1.0 ReactNativeWebView',
+          })}
+        />
+      </View>
+
+      {/* Subscribe button bar - fixed at bottom above iOS home indicator */}
+      <View style={styles.subscribeBar}>
+        <TouchableOpacity 
+          style={styles.subscribeButton}
+          onPress={handleSubscribePress}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.subscribeButtonText}>Subscribe for updates</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -466,8 +487,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
+  contentContainer: {
+    flex: 1, // Takes all available space above the subscribe bar
+  },
   webview: {
     flex: 1,
+  },
+  subscribeBar: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    // Ensures it stays above iOS home indicator
+    paddingBottom: Platform.OS === 'ios' ? 12 : 12,
+  },
+  subscribeButton: {
+    backgroundColor: '#3b82f6', // Blue branding
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Subtle shadow for depth
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3, // Android shadow
+  },
+  subscribeButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   loadingContainer: {
     position: 'absolute',
