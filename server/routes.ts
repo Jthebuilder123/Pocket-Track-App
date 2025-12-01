@@ -42,6 +42,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Replit Auth (Google OAuth + Email/Password)
   await setupAuth(app);
 
+  // PERF: Cache middleware - fetch user once per request
+  app.use((req: any, _res, next) => {
+    if (req.isAuthenticated?.()) {
+      req.cachedUser = null;
+      req.getUserCached = async () => {
+        if (!req.cachedUser) {
+          req.cachedUser = await storage.getUser(req.user.claims.sub);
+        }
+        return req.cachedUser;
+      };
+    }
+    next();
+  });
+
+  // PERF: Add cache headers for static assets
+  app.use((req, res, next) => {
+    // Cache static assets for 7 days (JS, CSS, images)
+    if (/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)(\?.*)?$/i.test(req.path)) {
+      res.set('Cache-Control', 'public, max-age=604800, immutable');
+    }
+    // HTML: Never cache (always check for updates)
+    else if (req.path.endsWith('.html') || !req.path.includes('.')) {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+    }
+    next();
+  });
+
   // Health check endpoint
   app.get("/healthz", async (_req, res) => {
     res.status(200).json({ 

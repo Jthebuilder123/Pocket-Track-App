@@ -20,10 +20,13 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   
-  // FIX: CACHE-BUSTING - Add timestamp to URL to force fresh load every time
+  // FIX: SMART CACHING - Use build hash instead of runtime timestamp
+  // This allows browser to cache JS/CSS/images across app launches
+  // but cache-busts when we update the app version
   const [webViewUrl] = useState(() => {
-    const timestamp = Date.now();
-    return `${POCKETTRACK_URL}?v=${timestamp}`;
+    // Build hash: Update this when deploying new app version (YYYY-MM-DD format)
+    const BUILD_HASH = '20251201'; // December 1, 2025
+    return `${POCKETTRACK_URL}?v=${BUILD_HASH}`;
   });
   
   // FIX: EXTERNAL LINKS - Handle deep linking returns from system browser
